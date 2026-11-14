@@ -66,8 +66,9 @@ export async function setActiveProgram(id: number): Promise<void> {
   });
 }
 
-export async function getActiveProgram(): Promise<Program | undefined> {
-  return db.programs.filter((p) => p.active).first();
+/** The active program, or null when none is set (never undefined, so useLive can tell "loading" apart). */
+export async function getActiveProgram(): Promise<Program | null> {
+  return (await db.programs.filter((p) => p.active).first()) ?? null;
 }
 
 /** The day the cursor points at, clamped to the plan. */

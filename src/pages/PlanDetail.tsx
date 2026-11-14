@@ -28,13 +28,13 @@ export function progressionLabel(s: PlanSlot, units: string): string {
 
 export function PlanDetail(props: { path?: string; id?: string }) {
   const id = Number(props.id);
-  const program = useLive(() => db.programs.get(id), [id]);
+  const program = useLive(() => db.programs.get(id).then((p) => p ?? null), [id]);
   const settings = useLive(() => getSettings());
   const [copied, setCopied] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   if (program === undefined || !settings) return <h1>Plan</h1>;
-  if (program === null || !program) {
+  if (program === null) {
     return (
       <>
         <h1>Plan not found</h1>

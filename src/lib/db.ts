@@ -62,20 +62,30 @@ export interface Program {
   active: boolean;
 }
 
+export interface PR {
+  exerciseName: string;
+  kind: 'e1rm' | 'weight' | 'reps';
+  value: number;
+  previous: number;
+}
+
 export interface Workout {
   id?: number;
   date: number;
   programId?: number;
   dayName?: string;
+  week?: number;
   finishedAt?: number;
   durationSec?: number;
   notes?: string;
+  prs?: PR[];
 }
 
 export interface WorkoutSet {
   id?: number;
   workoutId: number;
   exerciseName: string;
+  /** Exercise block position within the workout. */
   order: number;
   setIndex: number;
   type: SetType;
@@ -85,8 +95,14 @@ export interface WorkoutSet {
   note?: string;
   done: boolean;
   superset?: string;
+  targetWeight?: number;
   targetMinReps?: number;
   targetMaxReps?: number;
+  amrap?: boolean;
+  /** Reps field holds seconds. */
+  timed?: boolean;
+  restSec?: number;
+  progressionKind?: Progression['kind'];
 }
 
 export interface Cardio {

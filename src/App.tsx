@@ -6,9 +6,12 @@ import { PlanEditor } from './pages/PlanEditor';
 import { PlanDetail } from './pages/PlanDetail';
 import { Library } from './pages/Library';
 import { History } from './pages/History';
+import { WorkoutPage } from './pages/Workout';
+import { WorkoutSummary } from './pages/WorkoutSummary';
 import { Progress } from './pages/Progress';
 import { SettingsPage } from './pages/Settings';
 import { BASE } from './base';
+import { RestTimerBar } from './components/RestTimer';
 
 const TABS = [
   { path: '/', label: 'Today', icon: '◉' },
@@ -48,11 +51,14 @@ export function App() {
           <Library path={`${BASE}/plans/library`} />
           <PlanDetail path={`${BASE}/plans/:id`} />
           <PlanEditor path={`${BASE}/plans/:id/edit`} />
+          <WorkoutPage path={`${BASE}/workout/:id`} />
+          <WorkoutSummary path={`${BASE}/workout/:id/summary`} />
           <History path={`${BASE}/history`} />
           <Progress path={`${BASE}/progress`} />
           <SettingsPage path={`${BASE}/settings`} />
         </Router>
       </main>
+      <RestTimerBar />
       <nav class="tabbar">
         {TABS.map((t) => (
           <Link key={t.path} href={BASE + t.path} class={current === t.path ? 'tab active' : 'tab'}>
