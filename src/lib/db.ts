@@ -34,6 +34,10 @@ export interface PlanSlot {
   progression: Progression;
   superset?: string;
   note?: string;
+  /** Last set is "as many reps as possible" (e.g. 1x5+). */
+  amrap?: boolean;
+  /** Reps are seconds (e.g. 3x60s). */
+  timed?: boolean;
 }
 
 export interface PlanDay {
