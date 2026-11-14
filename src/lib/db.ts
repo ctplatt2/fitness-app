@@ -148,11 +148,12 @@ class LiftLogDB extends Dexie {
 
 export const db = new LiftLogDB();
 
-/** Seed the exercise library and settings on first run. */
+/** Seed the exercise library (adding any new built-ins on upgrade) and settings. */
 export async function initDb(): Promise<void> {
-  const count = await db.exercises.count();
-  if (count === 0) {
-    await db.exercises.bulkAdd(SEED_EXERCISES.map((e) => ({ ...e, custom: false })));
+  const existing = new Set((await db.exercises.toArray()).map((e) => e.name.toLowerCase()));
+  const missing = SEED_EXERCISES.filter((e) => !existing.has(e.name.toLowerCase()));
+  if (missing.length) {
+    await db.exercises.bulkAdd(missing.map((e) => ({ ...e, custom: false })));
   }
   const settings = await db.settings.get(1);
   if (!settings) await db.settings.put(DEFAULT_SETTINGS);

@@ -13,7 +13,6 @@ export function describeSlot(s: PlanSlot, units: string): string {
   if (s.timed) reps += 's';
   const bits = [reps];
   if (s.weight !== undefined) bits.push(`${s.weight} ${units}`);
-  else bits.push('bw');
   if (s.rpe !== undefined) bits.push(`RPE ${s.rpe}`);
   return bits.join(' · ');
 }

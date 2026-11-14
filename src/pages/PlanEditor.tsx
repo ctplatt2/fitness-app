@@ -1,7 +1,8 @@
 import { route } from 'preact-router';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { db } from '../lib/db';
-import { EXAMPLE_PLAN, PLAN_FORMAT_HELP, parsePlan } from '../lib/plan-parser';
+import { PLAN_FORMAT_HELP, parsePlan } from '../lib/plan-parser';
+import { TEMPLATES } from '../lib/templates';
 import { createCustomExercises, saveProgramFromText, unknownExercises } from '../lib/programs';
 import { BASE } from '../base';
 
@@ -69,10 +70,20 @@ export function PlanEditor(props: { path?: string; id?: string }) {
         <button class="btn small" onClick={() => history.back()}>Cancel</button>
       </div>
 
+      {!text.trim() && !editingId && (
+        <div class="card">
+          <strong>Start from a built-in plan</strong>
+          {TEMPLATES.map((t) => (
+            <button key={t.name} class="template" onClick={() => setText(t.text)}>
+              <span>{t.name}</span>
+              <span class="muted small-text">{t.blurb}</span>
+            </button>
+          ))}
+          <p class="muted small-text" style="margin:10px 0 0">…or type or paste your own below.</p>
+        </div>
+      )}
+
       <div class="chips">
-        {!text.trim() && (
-          <button class="btn small" onClick={() => setText(EXAMPLE_PLAN)}>Load example</button>
-        )}
         <button class="btn small" onClick={() => setShowHelp((v) => !v)}>{showHelp ? 'Hide format' : 'Format help'}</button>
         <button class="btn small" onClick={() => copy('ai', AI_PROMPT)}>
           {copied === 'ai' ? 'Copied!' : 'Copy prompt for ChatGPT/Claude'}

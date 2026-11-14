@@ -206,3 +206,22 @@ a.btn { text-decoration: none; }
   border-bottom: 1px solid var(--border);
 }
 .small-text { font-size: 0.8rem; }
+
+.template {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  margin-top: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.template .small-text { font-weight: 400; }
