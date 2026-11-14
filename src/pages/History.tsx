@@ -1,6 +1,7 @@
-import { Link } from 'preact-router';
+import { Link, route } from 'preact-router';
 import { useState } from 'preact/hooks';
-import { db, type WorkoutSet } from '../lib/db';
+import { ACTIVITIES, describeEffort, formatDuration } from '../lib/cardio';
+import { db, getSettings, type Cardio, type Workout, type WorkoutSet } from '../lib/db';
 import { useLive } from '../lib/use-live';
 import { fmtDuration } from '../lib/workouts';
 import { BASE } from '../base';
@@ -9,8 +10,12 @@ function fmtDate(ts: number): string {
   return new Date(ts).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
+type Entry = { kind: 'workout'; date: number; w: Workout } | { kind: 'cardio'; date: number; c: Cardio };
+
 export function History(_props: { path?: string }) {
-  const workouts = useLive(() => db.workouts.filter((w) => !!w.finishedAt).reverse().sortBy('date'));
+  const workouts = useLive(() => db.workouts.filter((w) => !!w.finishedAt).toArray());
+  const cardio = useLive(() => db.cardio.toArray());
+  const settings = useLive(() => getSettings());
   const [open, setOpen] = useState<number | null>(null);
   const sets = useLive<WorkoutSet[]>(() => (open ? db.sets.where('workoutId').equals(open).toArray() : Promise.resolve([])), [open]);
   const counts = useLive(async () => {
@@ -24,52 +29,116 @@ export function History(_props: { path?: string }) {
     return m;
   });
 
-  if (!workouts) return <h1>History</h1>;
-  const list = [...workouts].sort((a, b) => b.date - a.date);
+  if (!workouts || !cardio || !settings) return <h1>History</h1>;
+
+  const entries: Entry[] = [
+    ...workouts.map((w): Entry => ({ kind: 'workout', date: w.date, w })),
+    ...cardio.map((c): Entry => ({ kind: 'cardio', date: c.date, c })),
+  ].sort((a, b) => b.date - a.date);
+
+  // Group by calendar day so a lift and a run on the same day sit together.
+  const days: { label: string; items: Entry[] }[] = [];
+  for (const e of entries) {
+    const label = fmtDate(e.date);
+    const last = days[days.length - 1];
+    if (last && last.label === label) last.items.push(e);
+    else days.push({ label, items: [e] });
+  }
 
   return (
     <>
-      <h1>History</h1>
-      {list.length === 0 ? (
-        <div class="empty">No finished workouts yet.</div>
+      <div class="row-between">
+        <h1>History</h1>
+        <Link class="btn small" href={`${BASE}/cardio/new`}>+ Cardio</Link>
+      </div>
+      {entries.length === 0 ? (
+        <div class="empty">Nothing logged yet. Finished workouts and cardio show up here.</div>
       ) : (
-        list.map((w) => {
-          const c = counts?.[w.id!];
-          const isOpen = open === w.id;
-          return (
-            <div class="card tappable" key={w.id} onClick={() => setOpen(isOpen ? null : w.id!)}>
-              <div class="row-between">
-                <strong>{w.dayName ?? 'Workout'}</strong>
-                <span class="muted small-text">{fmtDate(w.date)}</span>
-              </div>
-              <div class="muted small-text" style="margin-top:4px">
-                {fmtDuration(w.durationSec ?? 0)} · {c?.sets ?? 0} sets · {c?.exercises.size ?? 0} exercises
-                {w.prs?.length ? ` · 🏆 ${w.prs.length} PR${w.prs.length === 1 ? '' : 's'}` : ''}
-              </div>
-              {isOpen && sets && (
-                <ul class="slots">
-                  {[...new Map(sets.sort((a, b) => a.order - b.order || a.setIndex - b.setIndex).map((s) => [s.order, s.exerciseName])).entries()].map(([order, name]) => (
-                    <li key={order}>
-                      <div class="slot-main">
-                        <span>{name}</span>
-                        <span class="muted small-text">
-                          {sets
-                            .filter((s) => s.order === order && s.type !== 'warmup')
-                            .map((s) => (s.weight !== undefined ? `${s.weight}×${s.reps ?? 0}` : `${s.reps ?? 0}`))
-                            .join(' · ')}
-                        </span>
-                      </div>
-                    </li>
-                  ))}
-                  <li>
-                    <Link href={`${BASE}/workout/${w.id}/summary`} class="muted small-text" onClick={(e: Event) => e.stopPropagation()}>View summary →</Link>
-                  </li>
-                </ul>
-              )}
-            </div>
-          );
-        })
+        days.map((d) => (
+          <section key={d.label}>
+            <h2 class="day-label">{d.label}</h2>
+            {d.items.map((e) =>
+              e.kind === 'cardio' ? (
+                <CardioCard key={`c${e.c.id}`} c={e.c} distUnit={settings.distanceUnit} />
+              ) : (
+                <WorkoutCard
+                  key={`w${e.w.id}`}
+                  w={e.w}
+                  count={counts?.[e.w.id!]}
+                  open={open === e.w.id}
+                  sets={open === e.w.id ? sets : undefined}
+                  onToggle={() => setOpen(open === e.w.id ? null : e.w.id!)}
+                />
+              ),
+            )}
+          </section>
+        ))
       )}
     </>
+  );
+}
+
+function CardioCard(props: { c: Cardio; distUnit: string }) {
+  const { c } = props;
+  const a = ACTIVITIES.find((x) => x.id === c.activity);
+  return (
+    <div class="card tappable" onClick={() => route(`${BASE}/cardio/${c.id}`)}>
+      <div class="row-between">
+        <strong>
+          {a?.icon} {a?.label ?? c.activity}
+        </strong>
+        <span class="muted small-text">{new Date(c.date).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>
+      </div>
+      <div class="muted small-text" style="margin-top:4px">
+        {formatDuration(c.durationSec)}
+        {c.distance ? ` · ${c.distance} ${props.distUnit} · ${describeEffort(c.activity, c.durationSec, c.distance, props.distUnit)}` : ''}
+        {c.avgHr ? ` · ${c.avgHr} bpm` : ''}
+        {c.notes ? ` · ${c.notes}` : ''}
+      </div>
+    </div>
+  );
+}
+
+function WorkoutCard(props: {
+  w: Workout;
+  count?: { sets: number; exercises: Set<string> };
+  open: boolean;
+  sets?: WorkoutSet[];
+  onToggle: () => void;
+}) {
+  const { w, count: c, open, sets } = props;
+  return (
+    <div class="card tappable" onClick={props.onToggle}>
+      <div class="row-between">
+        <strong>🏋️ {w.dayName ?? 'Workout'}</strong>
+        <span class="muted small-text">{new Date(w.date).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>
+      </div>
+      <div class="muted small-text" style="margin-top:4px">
+        {fmtDuration(w.durationSec ?? 0)} · {c?.sets ?? 0} sets · {c?.exercises.size ?? 0} exercises
+        {w.prs?.length ? ` · 🏆 ${w.prs.length} PR${w.prs.length === 1 ? '' : 's'}` : ''}
+      </div>
+      {open && sets && (
+        <ul class="slots">
+          {[...new Map(sets.sort((a, b) => a.order - b.order || a.setIndex - b.setIndex).map((s) => [s.order, s.exerciseName])).entries()].map(([order, name]) => (
+            <li key={order}>
+              <div class="slot-main">
+                <span>{name}</span>
+                <span class="muted small-text">
+                  {sets
+                    .filter((s) => s.order === order && s.type !== 'warmup')
+                    .map((s) => (s.weight !== undefined ? `${s.weight}×${s.reps ?? 0}` : `${s.reps ?? 0}`))
+                    .join(' · ')}
+                </span>
+              </div>
+            </li>
+          ))}
+          <li>
+            <Link href={`${BASE}/workout/${w.id}/summary`} class="muted small-text" onClick={(e: Event) => e.stopPropagation()}>
+              View summary →
+            </Link>
+          </li>
+        </ul>
+      )}
+    </div>
   );
 }

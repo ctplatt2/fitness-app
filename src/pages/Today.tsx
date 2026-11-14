@@ -74,9 +74,12 @@ export function Today(_props: { path?: string }) {
         </div>
       )}
 
-      {!active && (
-        <button class="btn block" disabled={busy} onClick={() => start('empty')}>Start empty workout</button>
-      )}
+      <div class="chips" style="margin-top:0">
+        {!active && (
+          <button class="btn" style="flex:1" disabled={busy} onClick={() => start('empty')}>Empty workout</button>
+        )}
+        <Link class="btn" style="flex:1" href={`${BASE}/cardio/new`}>Log cardio</Link>
+      </div>
       <p class="muted">{exerciseCount ?? '…'} exercises in your library.</p>
     </>
   );

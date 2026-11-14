@@ -37,6 +37,24 @@ export function SettingsPage(_props: { path?: string }) {
         </p>
       </div>
       <div class="card">
+        <strong>Distance</strong>
+        <div style="display:flex; gap:8px; margin-top:8px">
+          {(['mi', 'km'] as const).map((u) => (
+            <button
+              key={u}
+              class={s.distanceUnit === u ? 'btn primary' : 'btn'}
+              onClick={async () => {
+                const next = { ...s, distanceUnit: u };
+                await db.settings.put(next);
+                setS(next);
+              }}
+            >
+              {u}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div class="card">
         <strong>Data</strong>
         <p class="muted" style="margin:8px 0 0">Backup and restore arrive in phase 6.</p>
       </div>

@@ -122,9 +122,12 @@ export interface BodyEntry {
   measurements?: Record<string, number>;
 }
 
+export type DistanceUnit = 'mi' | 'km';
+
 export interface Settings {
   id: 1;
   units: Units;
+  distanceUnit: DistanceUnit;
   barWeight: number;
   plates: number[];
   defaultRest: number;
@@ -134,6 +137,7 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   id: 1,
   units: 'lb',
+  distanceUnit: 'mi',
   barWeight: 45,
   plates: [45, 35, 25, 10, 5, 2.5],
   defaultRest: 120,
@@ -180,6 +184,7 @@ export async function initDb(): Promise<void> {
   }
 }
 
+/** Stored settings, with defaults filled in for fields added since the row was written. */
 export async function getSettings(): Promise<Settings> {
-  return (await db.settings.get(1)) ?? DEFAULT_SETTINGS;
+  return { ...DEFAULT_SETTINGS, ...((await db.settings.get(1)) ?? {}) };
 }
