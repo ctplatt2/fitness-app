@@ -95,6 +95,7 @@ function CardioCard(props: { c: Cardio; distUnit: string }) {
         {c.distance ? ` · ${c.distance} ${props.distUnit} · ${describeEffort(c.activity, c.durationSec, c.distance, props.distUnit)}` : ''}
         {c.avgHr ? ` · ${c.avgHr} bpm` : ''}
         {c.notes ? ` · ${c.notes}` : ''}
+        {c.stravaId ? <span class="badge subtle">Strava</span> : null}
       </div>
     </div>
   );

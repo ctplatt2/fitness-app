@@ -3,6 +3,7 @@ import { useState } from 'preact/hooks';
 import { db, getSettings } from '../lib/db';
 import { useLive } from '../lib/use-live';
 import { advanceProgram, cardioMinutes, currentDay, getActiveProgram } from '../lib/programs';
+import { getStrava, isConnected, syncStrava } from '../lib/strava';
 import { getActiveWorkout, startEmptyWorkout, startWorkoutFromProgram } from '../lib/workouts';
 import { CHECKPOINTS, checkpointForWeek, missingTests } from '../components/CheckIns';
 import { mobilityThisWeek } from './Mobility';
@@ -17,6 +18,18 @@ export function Today(_props: { path?: string }) {
   const loggedCount = useLive(async () => (await db.workouts.count()) + (await db.cardio.count()));
   const mobilityCount = useLive(() => mobilityThisWeek());
   const [busy, setBusy] = useState(false);
+  const [stravaMsg, setStravaMsg] = useState('');
+  const strava = isConnected(getStrava());
+
+  async function pullFromStrava() {
+    setStravaMsg('Checking Strava…');
+    try {
+      const r = await syncStrava();
+      setStravaMsg(r.planAdvanced ? '' : r.added + r.linked > 0 ? `Added ${r.added + r.linked} from Strava, but none from today match this session.` : 'Nothing new on Strava yet. Has your watch uploaded?');
+    } catch (e) {
+      setStravaMsg((e as Error).message);
+    }
+  }
 
   if (program === undefined || active === undefined || !settings) return <h1>Today</h1>;
 
@@ -95,6 +108,12 @@ export function Today(_props: { path?: string }) {
                 <button class="btn primary block" style="margin-top:12px" onClick={() => advanceProgram(program.id!)}>
                   Rest done, show next day
                 </button>
+              )}
+              {strava && day.cardio && !hasLifts && (
+                <>
+                  <button class="btn block" style="margin-top:8px" onClick={pullFromStrava}>Get it from Strava</button>
+                  {stravaMsg && <p class="muted small-text" style="margin:8px 0 0">{stravaMsg}</p>}
+                </>
               )}
               {!day.rest && (
                 <button class="linkbtn muted small-text" style="display:block; margin:0 auto" onClick={() => advanceProgram(program.id!)}>

@@ -134,6 +134,8 @@ export interface Cardio {
   distance?: number;
   avgHr?: number;
   notes?: string;
+  /** Set when this entry came from (or was matched to) a Strava activity. */
+  stravaId?: number;
 }
 
 export interface BodyEntry {

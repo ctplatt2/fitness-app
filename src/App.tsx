@@ -14,6 +14,8 @@ import { Progress } from './pages/Progress';
 import { SettingsPage } from './pages/Settings';
 import { BASE } from './base';
 import { RestTimerBar } from './components/RestTimer';
+import { StravaReturn } from './pages/StravaReturn';
+import { STATE_PREFIX, autoSync } from './lib/strava';
 
 const TABS = [
   { path: '/', label: 'Today', icon: '◉' },
@@ -34,11 +36,24 @@ function tabFor(url: string): string {
 
 export function App() {
   const [current, setCurrent] = useState(tabFor(location.pathname));
+  // Coming back from Strava's approval page.
+  const query = new URLSearchParams(location.search);
+  const fromStrava = (query.get('state') ?? '').startsWith(STATE_PREFIX) && (query.has('code') || query.has('error'));
+
+  useEffect(() => {
+    if (fromStrava) return;
+    void autoSync();
+    const onVisible = () => document.visibilityState === 'visible' && void autoSync();
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, []);
 
   useEffect(() => {
     if (location.pathname === BASE) route(BASE + '/', true);
     // Scroll to top on every route change (the tab bar is fixed).
   }, []);
+
+  if (fromStrava) return <StravaReturn query={query} />;
 
   return (
     <div class="app">

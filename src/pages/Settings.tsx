@@ -3,6 +3,7 @@ import { checkBackup, type BackupCheck } from '../lib/backup-format';
 import { parseHistoryCsv } from '../lib/csv-history';
 import { backUpNow, planImport, restoreBackup, runImport, type ImportPlan } from '../lib/data-io';
 import { db, getSettings, type Settings } from '../lib/db';
+import { beginConnect, disconnect, finishConnect, getStrava, isConnected, saveApp, syncStrava } from '../lib/strava';
 import { askForNotifications, lockAlarmEnabled, notificationState, setLockAlarm } from '../lib/timer';
 import { useLive } from '../lib/use-live';
 
@@ -49,6 +50,7 @@ export function SettingsPage(_props: { path?: string }) {
       <Equipment s={s} save={save} />
       <AlertsCard />
       <ListsCard s={s} save={save} />
+      <StravaCard />
       <BackupCard s={s} />
       <ImportCard s={s} />
     </>
@@ -346,6 +348,132 @@ function ListsCard(props: { s: Settings; save: (p: Partial<Settings>) => Promise
         <textarea class="input" rows={6} value={tests} onInput={(e) => setTests((e.target as HTMLTextAreaElement).value)} />
       </label>
       <button class="btn small primary" style="margin-top:12px" disabled={!dirty} onClick={apply}>{saved ? 'Saved' : 'Save'}</button>
+    </div>
+  );
+}
+
+function StravaCard() {
+  const [st, setSt] = useState(getStrava());
+  const [id, setId] = useState('');
+  const [secret, setSecret] = useState('');
+  const [code, setCode] = useState('');
+  const [msg, setMsg] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [confirm, setConfirm] = useState(false);
+  const refresh = () => setSt(getStrava());
+
+  async function run(fn: () => Promise<string | void>) {
+    setBusy(true);
+    setError('');
+    setMsg('');
+    try {
+      setMsg((await fn()) ?? '');
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+      refresh();
+    }
+  }
+
+  const sync = () =>
+    run(async () => {
+      const r = await syncStrava();
+      const parts = [`${r.added} added`];
+      if (r.linked) parts.push(`${r.linked} matched to entries you logged`);
+      return `Synced: ${parts.join(', ')}.${r.planAdvanced ? ' Your plan moved on a day.' : ''}`;
+    });
+
+  return (
+    <div class="card">
+      <strong>Strava</strong>
+      {!st ? (
+        <>
+          <p class="muted small-text" style="margin:6px 0 0">
+            Pull your runs, rides, walks, swims, rows, tennis and soccer in from Strava so you don't log them twice. Strava needs you to register a free API application first:
+          </p>
+          <ol class="steps small-text">
+            <li>On a computer, open <strong>strava.com/settings/api</strong> and create an application (any name and website will do).</li>
+            <li>Set <strong>Authorization Callback Domain</strong> to <code>{location.hostname}</code>.</li>
+            <li>Copy its <strong>Client ID</strong> and <strong>Client Secret</strong> into the boxes below.</li>
+          </ol>
+          <div class="grid2">
+            <label>
+              <span class="muted">Client ID</span>
+              <input class="input" inputMode="numeric" autocomplete="off" value={id} onInput={(e) => setId((e.target as HTMLInputElement).value)} />
+            </label>
+            <label>
+              <span class="muted">Client Secret</span>
+              <input class="input" type="password" autocomplete="off" value={secret} onInput={(e) => setSecret((e.target as HTMLInputElement).value)} />
+            </label>
+          </div>
+          <p class="muted small-text" style="margin:8px 0 0">These stay on this device only. They are not in the app's code and are left out of backups.</p>
+          <button
+            class="btn small primary"
+            style="margin-top:12px"
+            disabled={!/^\d+$/.test(id.trim()) || secret.trim().length < 20}
+            onClick={() => {
+              saveApp(id, secret);
+              setSecret('');
+              refresh();
+            }}
+          >
+            Save
+          </button>
+        </>
+      ) : !isConnected(st) ? (
+        <>
+          <p class="muted small-text" style="margin:6px 0 0">
+            App details saved (client ID {st.clientId}). Now approve access on Strava. Leave "View data about your activities" ticked.
+          </p>
+          <div class="chips" style="margin-bottom:0">
+            <button class="btn small primary" disabled={busy} onClick={beginConnect}>Connect to Strava</button>
+            <button class="btn small" onClick={() => run(async () => disconnect(true))}>Change app details</button>
+          </div>
+          <label style="display:block; margin-top:12px">
+            <span class="muted small-text">If Strava sent you to a page with a code instead of back here, paste it:</span>
+            <input class="input" autocomplete="off" value={code} onInput={(e) => setCode((e.target as HTMLInputElement).value)} />
+          </label>
+          <button
+            class="btn small"
+            style="margin-top:8px"
+            disabled={busy || code.trim().length < 10}
+            onClick={() =>
+              run(async () => {
+                await finishConnect(code);
+                setCode('');
+                const r = await syncStrava();
+                return `Connected. Added ${r.added} activities from the last 90 days.`;
+              })
+            }
+          >
+            Use code
+          </button>
+        </>
+      ) : (
+        <>
+          <p class="small-text" style="margin:6px 0 0">
+            Connected{st.athlete ? ` as ${st.athlete}` : ''}. Last sync: {st.lastSync ? new Date(st.lastSync).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'not yet'}.
+          </p>
+          <p class="muted small-text" style="margin:6px 0 0">
+            Syncs by itself when you open the app. Strength sessions on Strava are skipped. Deleting an imported entry here keeps it from coming back.
+          </p>
+          <div class="chips" style="margin-bottom:0">
+            <button class="btn small primary" disabled={busy} onClick={sync}>{busy ? 'Syncing…' : 'Sync now'}</button>
+            {confirm ? (
+              <>
+                <button class="btn small danger" onClick={() => { setConfirm(false); void run(async () => disconnect(false)); }}>Yes, disconnect</button>
+                <button class="btn small" onClick={() => setConfirm(false)}>Cancel</button>
+              </>
+            ) : (
+              <button class="btn small" onClick={() => setConfirm(true)}>Disconnect</button>
+            )}
+          </div>
+        </>
+      )}
+      {msg && <p class="ok small-text" style="margin:10px 0 0">{msg}</p>}
+      {error && <p class="err small-text" style="margin:10px 0 0">{error}</p>}
     </div>
   );
 }

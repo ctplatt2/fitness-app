@@ -3,6 +3,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { ACTIVITIES, describeEffort, formatDuration, parseDuration } from '../lib/cardio';
 import { db, getSettings, type Cardio, type CardioActivity } from '../lib/db';
 import { advanceProgram, currentDay } from '../lib/programs';
+import { ignoreStravaId } from '../lib/strava';
 import { useLive } from '../lib/use-live';
 import { BASE } from '../base';
 
@@ -73,7 +74,12 @@ export function CardioEntry(props: { path?: string; id?: string }) {
   }
 
   async function remove() {
-    if (editingId) await db.cardio.delete(editingId);
+    if (editingId) {
+      // Don't let the next Strava sync bring a deleted activity back.
+      const row = await db.cardio.get(editingId);
+      if (row?.stravaId) ignoreStravaId(row.stravaId);
+      await db.cardio.delete(editingId);
+    }
     route(`${BASE}/history`, true);
   }
 
