@@ -3,7 +3,7 @@ import { db } from '../lib/db';
 import { useLive } from '../lib/use-live';
 import { Sheet } from './Sheet';
 
-export function ExercisePicker(props: { onPick: (name: string) => void; onClose: () => void }) {
+export function ExercisePicker(props: { onPick: (name: string) => void; onClose: () => void; title?: string }) {
   const exercises = useLive(() => db.exercises.orderBy('name').toArray());
   const [q, setQ] = useState('');
   const needle = q.trim().toLowerCase();
@@ -20,7 +20,7 @@ export function ExercisePicker(props: { onPick: (name: string) => void; onClose:
   }
 
   return (
-    <Sheet title="Add exercise" onClose={props.onClose}>
+    <Sheet title={props.title ?? 'Add exercise'} onClose={props.onClose}>
       <input class="input" type="search" placeholder="Search" value={q} autofocus onInput={(e) => setQ((e.target as HTMLInputElement).value)} />
       <ul class="list" style="max-height:50vh; overflow:auto; margin-top:8px">
         {needle && !exact && (
@@ -29,7 +29,7 @@ export function ExercisePicker(props: { onPick: (name: string) => void; onClose:
             <button class="btn small primary" onClick={create}>Create</button>
           </li>
         )}
-        {list.slice(0, 60).map((e) => (
+        {list.slice(0, needle ? 60 : 200).map((e) => (
           <li key={e.id} class="list-item tappable" onClick={() => props.onPick(e.name)}>
             <div>
               <div>{e.name}</div>

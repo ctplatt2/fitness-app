@@ -92,3 +92,24 @@ describe('weekBlockFor', () => {
     expect(weekBlockFor(weeks, 5)).toMatchObject({ weekNumber: 1 });
   });
 });
+
+describe('cardio and rest days', () => {
+  const text = '# P\n### Tue\nRun / 35-50 min / easy / with strides\n### Wed\nRow / 3x8 / 100lb\n### Thu\nBike / 45 min\nPlank / 3x60s\n### Sun\nRest / walk if you like\n';
+  it('parses them without treating lifts as cardio', () => {
+    const p = parsePlan(text);
+    expect(p.errors).toEqual([]);
+    const [tue, wed, thu, sun] = p.weeks[0].days;
+    expect(tue.cardio).toEqual({ activity: 'run', label: 'Run', minMin: 35, maxMin: 50, note: 'easy / with strides' });
+    expect(tue.slots).toEqual([]);
+    expect(wed.cardio).toBeUndefined();
+    expect(wed.slots[0].exerciseName).toBe('Row');
+    expect(thu.cardio).toMatchObject({ activity: 'bike', minMin: 45, maxMin: 45 });
+    expect(thu.slots).toHaveLength(1);
+    expect(sun).toMatchObject({ rest: true, note: 'walk if you like' });
+    expect(p.exerciseNames).toEqual(['Row', 'Plank']);
+  });
+  it('round-trips', () => {
+    const p = parsePlan(text);
+    expect(parsePlan(serializePlan(p.name, p.weeks, 'lb')).weeks).toEqual(p.weeks);
+  });
+});

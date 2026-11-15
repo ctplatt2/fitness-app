@@ -18,6 +18,7 @@ import {
   previousSets,
   removeExercise,
   removeSet,
+  swapExercise,
   uncompleteSet,
   updateSet,
 } from '../lib/workouts';
@@ -223,6 +224,7 @@ function ExerciseBlock(props: {
 }) {
   const [menu, setMenu] = useState(false);
   const [history, setHistory] = useState(false);
+  const [swapping, setSwapping] = useState(false);
   const type = props.exercise?.type ?? 'weight_reps';
   const timed = type === 'time' || props.sets.some((s) => s.timed);
   const showWeight = type !== 'reps' && type !== 'time';
@@ -258,9 +260,22 @@ function ExerciseBlock(props: {
           <ExerciseHistory name={props.name} units={props.settings.units} initial={8} />
         </Sheet>
       )}
+      {swapping && (
+        <ExercisePicker
+          title={`Swap ${props.name} for…`}
+          onClose={() => setSwapping(false)}
+          onPick={async (name) => {
+            setSwapping(false);
+            await swapExercise(props.workoutId, props.sets[0].order, name);
+          }}
+        />
+      )}
       {menu && (
         <div class="chips">
           <button class="btn small" onClick={() => { setMenu(false); setHistory(true); }}>History</button>
+          {props.sets.some((x) => !x.done) && (
+            <button class="btn small" onClick={() => { setMenu(false); setSwapping(true); }}>Swap exercise</button>
+          )}
           {canWarmup && (
             <button
               class="btn small"

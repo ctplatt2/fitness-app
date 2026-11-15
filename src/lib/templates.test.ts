@@ -13,9 +13,14 @@ describe('built-in templates', () => {
       expect(unknown).toEqual([]);
     });
   }
-  it('the 12-week plan covers weeks 1–12 with 4 days each', () => {
+  it('the 12-week plan covers weeks 1–12 with 7 days each, including run, sport and rest days', () => {
     const p = parsePlan(TEMPLATES[0].text);
     expect(p.weeks.map((w) => w.range)).toEqual([[1, 3], [4, 4], [5, 7], [8, 8], [9, 11], [12, 12]]);
-    for (const w of p.weeks) expect(w.days).toHaveLength(4);
+    for (const w of p.weeks) {
+      expect(w.days).toHaveLength(7);
+      expect(w.days[1].cardio).toMatchObject({ activity: 'run', minMin: 35, maxMin: 50 });
+      expect(w.days[5].cardio?.activity).toBe('other');
+      expect(w.days[6].rest).toBe(true);
+    }
   });
 });

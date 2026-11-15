@@ -40,9 +40,24 @@ export interface PlanSlot {
   timed?: boolean;
 }
 
+/** A run, ride, sport session or other cardio prescribed by a plan day. */
+export interface PlanCardio {
+  activity: CardioActivity;
+  /** What the plan calls it, e.g. "Run" or "Sport". */
+  label: string;
+  minMin?: number;
+  maxMin?: number;
+  note?: string;
+}
+
 export interface PlanDay {
   name: string;
   slots: PlanSlot[];
+  /** Set on cardio days (a day can also have exercises, e.g. a run plus mobility). */
+  cardio?: PlanCardio;
+  /** A rest day: nothing to log. */
+  rest?: boolean;
+  note?: string;
 }
 
 export interface PlanWeek {

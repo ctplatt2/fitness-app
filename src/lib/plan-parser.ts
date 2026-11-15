@@ -1,4 +1,4 @@
-import type { PlanDay, PlanSlot, PlanWeek, Progression } from './db';
+import type { CardioActivity, PlanCardio, PlanDay, PlanSlot, PlanWeek, Progression } from './db';
 
 export interface ParsedPlan {
   name: string;
@@ -21,6 +21,10 @@ Tricep Pushdown / 3x12 / superset A
 Lateral Raise / 3x15 / superset A
 Plank / 3x60s                       (time in seconds)
 
+Cardio and rest days (a line with no sets x reps):
+Run / 35-50 min / easy, conversational     (also Walk, Bike, Row, Swim, Sport)
+Rest / walk or easy yoga if you like
+
 Rules: lp(5lb) adds 5lb whenever every set hits its reps.
        dp(5lb, 8, 12) works reps up from 8 to 12, then adds 5lb and resets to 8.
        none keeps the same numbers (good for a deload week).
@@ -33,6 +37,37 @@ const RPE_RE = /^rpe\s*:?\s*(\d+(?:\.\d+)?)$/i;
 const SUPERSET_RE = /^superset\s*:?\s*([a-z0-9]+)$/i;
 const PROGRESS_RE = /^progress\s*:?\s*(.+)$/i;
 const WEEK_RE = /^week\s*(\d+)(?:\s*[-–]\s*(\d+))?$/i;
+
+const CARDIO_WORDS: Record<string, CardioActivity> = {
+  run: 'run', jog: 'run', walk: 'walk', hike: 'walk', bike: 'bike', ride: 'bike', cycle: 'bike',
+  row: 'row', swim: 'swim', sport: 'other', tennis: 'other', soccer: 'other', cardio: 'other',
+};
+const MINUTES_RE = /^(\d+)(?:\s*[-–]\s*(\d+))?\s*(?:min|mins|minutes|m)$/i;
+
+/**
+ * A day-level line: "Rest" or a cardio activity such as "Run / 35-50 min / easy".
+ * Lines with sets x reps are exercises (so "Row / 3x8" is still a lift).
+ */
+export function parseDayActivity(line: string): { rest: true; note?: string } | { cardio: PlanCardio } | null {
+  const parts = line.split('/').map((p) => p.trim());
+  const head = parts[0].toLowerCase();
+  const rest = parts.slice(1).filter(Boolean);
+  if (rest.some((p) => SETS_RE.test(p))) return null;
+  if (head === 'rest') return { rest: true, note: rest.join(' / ') || undefined };
+  const activity = CARDIO_WORDS[head];
+  if (!activity) return null;
+  const cardio: PlanCardio = { activity, label: parts[0] };
+  const notes: string[] = [];
+  for (const p of rest) {
+    const m = MINUTES_RE.exec(p);
+    if (m && cardio.minMin === undefined) {
+      cardio.minMin = Number(m[1]);
+      cardio.maxMin = m[2] ? Number(m[2]) : Number(m[1]);
+    } else notes.push(p);
+  }
+  if (notes.length) cardio.note = notes.join(' / ');
+  return { cardio };
+}
 
 export function parseProgression(text: string): Progression | null {
   const t = text.trim().toLowerCase();
@@ -166,6 +201,14 @@ export function parsePlan(text: string): ParsedPlan {
       day = { name: `Day ${week.days.length + 1}`, slots: [] };
       week.days.push(day);
     }
+    const activity = parseDayActivity(trimmed);
+    if (activity) {
+      if ('rest' in activity) {
+        day.rest = true;
+        if (activity.note) day.note = activity.note;
+      } else day.cardio = activity.cardio;
+      return;
+    }
     const slot = parseSlotLine(trimmed, lineNo, errors);
     if (slot) {
       day.slots.push(slot);
@@ -179,7 +222,7 @@ export function parsePlan(text: string): ParsedPlan {
 
   for (const w of weeks) {
     if (w.days.length === 0) errors.push(`Week ${w.range[0]} has no days`);
-    for (const d of w.days) if (d.slots.length === 0) errors.push(`Day "${d.name}" has no exercises`);
+    for (const d of w.days) if (d.slots.length === 0 && !d.cardio && !d.rest) errors.push(`Day "${d.name}" has no exercises`);
   }
   if (weeks.length === 0) errors.push('No exercises found');
   if (!name) name = 'Untitled plan';
@@ -213,6 +256,13 @@ export function serializeSlot(s: PlanSlot, units: string): string {
   return parts.join(' / ');
 }
 
+export function serializeCardio(c: PlanCardio): string {
+  const parts = [c.label];
+  if (c.minMin !== undefined) parts.push(`${c.minMin}${c.maxMin !== undefined && c.maxMin !== c.minMin ? `-${c.maxMin}` : ''} min`);
+  if (c.note) parts.push(c.note);
+  return parts.join(' / ');
+}
+
 export function serializePlan(name: string, weeks: PlanWeek[], units: string): string {
   const out: string[] = [`# ${name}`];
   const single = weeks.length === 1 && weeks[0].range[0] === 1 && weeks[0].range[1] === 1;
@@ -224,6 +274,8 @@ export function serializePlan(name: string, weeks: PlanWeek[], units: string): s
     for (const d of w.days) {
       out.push('');
       out.push(`### ${d.name}`);
+      if (d.rest) out.push(['Rest', d.note].filter(Boolean).join(' / '));
+      if (d.cardio) out.push(serializeCardio(d.cardio));
       for (const s of d.slots) out.push(serializeSlot(s, units));
     }
   }

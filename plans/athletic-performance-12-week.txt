@@ -1,7 +1,6 @@
 # Athletic Performance 12-Week
 // Strength, speed, agility and aerobic fitness for running, tennis and soccer.
-// Mon lower / Wed upper / Thu speed / Fri full body. Tue easy run (35–50 min) and
-// Sat sport or easy run (50–75 min) are logged as cardio. Sun rest.
+// Mon lower / Tue easy run / Wed upper / Thu speed / Fri full body / Sat sport or run / Sun rest.
 // Leave 1–3 reps in reserve on most lifts. Jumps and sprints are never done to failure.
 // Deload weeks: 4, 8 and 12.
 
@@ -15,6 +14,9 @@ Romanian Deadlift / 2x6-8 / rest 2:00 / progress: dp(5lb, 6, 8) / hip hinge, neu
 Bulgarian Split Squat / 2x8 / rest 1:30 / progress: lp(5lb) / each leg; knee aligned, smooth eccentric
 Standing Calf Raise / 2x10-12 / rest 1:00 / progress: dp(10lb, 10, 12) / full controlled range
 Pallof Press / 2x10 / rest 1:00 / progress: none / each side; resist rotation, exhale and brace
+
+### Tue · Easy run
+Run / 35-50 min / conversational Zone 2, should feel restorative; finish with 10 min mobility
 
 ### Wed · Upper body & rotation
 Medicine Ball Rotational Throw / 3x5 / rest 1:30 / progress: none / each side; explosive, reset each throw
@@ -42,6 +44,12 @@ Copenhagen Plank / 2x20s / bw / rest 1:00 / progress: none / each side; start fr
 Seated Calf Raise / 2x12 / rest 1:00 / progress: lp(10lb) / slow lowering
 Cable Chop / 2x10 / rest 1:00 / progress: lp(5lb) / each side; rotate deliberately
 
+### Sat · Sport or easy run
+Sport / 60-90 min / tennis or soccer, or an easy 50–75 min run instead; competitive soccer counts as a hard session
+
+### Sun · Rest
+Rest / walk or easy yoga if you like
+
 ## Week 4
 // Deload: 30–40% fewer sets, same weights. Cuts and contacts down ~35%, technique focus.
 
@@ -52,6 +60,9 @@ Romanian Deadlift / 2x6 / rest 2:00 / progress: none
 Bulgarian Split Squat / 1x8 / progress: none / each leg
 Standing Calf Raise / 1x12 / progress: none
 Pallof Press / 1x10 / progress: none / each side
+
+### Tue · Easy run
+Run / 35-50 min / conversational Zone 2, should feel restorative; finish with 10 min mobility
 
 ### Wed · Upper body & rotation (deload)
 Medicine Ball Rotational Throw / 2x5 / rest 1:30 / progress: none / each side
@@ -77,6 +88,12 @@ Copenhagen Plank / 1x20s / bw / progress: none / each side
 Seated Calf Raise / 1x12 / progress: none
 Cable Chop / 1x10 / progress: none / each side
 
+### Sat · Sport or easy run
+Sport / 60-90 min / tennis or soccer, or an easy 50–75 min run instead; competitive soccer counts as a hard session
+
+### Sun · Rest
+Rest / walk or easy yoga if you like
+
 ## Week 5-7
 // Build: full prescribed sets. Accelerations at 85–95%, crisp controlled cuts.
 
@@ -87,6 +104,9 @@ Romanian Deadlift / 3x6-8 / rest 2:00 / progress: dp(5lb, 6, 8)
 Bulgarian Split Squat / 3x8 / rest 1:30 / progress: lp(5lb) / each leg
 Standing Calf Raise / 3x10-12 / rest 1:00 / progress: dp(10lb, 10, 12)
 Pallof Press / 3x10 / rest 1:00 / progress: none / each side
+
+### Tue · Easy run
+Run / 35-50 min / conversational Zone 2, should feel restorative; finish with 10 min mobility
 
 ### Wed · Upper body & rotation
 Medicine Ball Rotational Throw / 3x5 / rest 1:30 / progress: none / each side
@@ -112,6 +132,12 @@ Copenhagen Plank / 2x25s / bw / rest 1:00 / progress: none / each side
 Seated Calf Raise / 3x12 / rest 1:00 / progress: lp(10lb)
 Cable Chop / 2x10 / rest 1:00 / progress: lp(5lb) / each side
 
+### Sat · Sport or easy run
+Sport / 60-90 min / tennis or soccer, or an easy 50–75 min run instead; competitive soccer counts as a hard session
+
+### Sun · Rest
+Rest / walk or easy yoga if you like
+
 ## Week 8
 // Deload: 30–40% fewer sets, same weights. Low volume, keep movement quality.
 
@@ -122,6 +148,9 @@ Romanian Deadlift / 2x6 / rest 2:00 / progress: none
 Bulgarian Split Squat / 2x8 / progress: none / each leg
 Standing Calf Raise / 2x12 / progress: none
 Pallof Press / 2x10 / progress: none / each side
+
+### Tue · Easy run
+Run / 35-50 min / conversational Zone 2, should feel restorative; finish with 10 min mobility
 
 ### Wed · Upper body & rotation (deload)
 Medicine Ball Rotational Throw / 2x5 / rest 1:30 / progress: none / each side
@@ -147,6 +176,12 @@ Copenhagen Plank / 1x25s / bw / progress: none / each side
 Seated Calf Raise / 2x12 / progress: none
 Cable Chop / 1x10 / progress: none / each side
 
+### Sat · Sport or easy run
+Sport / 60-90 min / tennis or soccer, or an easy 50–75 min run instead; competitive soccer counts as a hard session
+
+### Sun · Rest
+Rest / walk or easy yoga if you like
+
 ## Week 9-11
 // Maintain heavy strength; prioritise bar speed and power quality. Add reactive drills.
 
@@ -157,6 +192,9 @@ Romanian Deadlift / 3x6-8 / rest 2:00 / progress: dp(5lb, 6, 8)
 Bulgarian Split Squat / 3x8 / rest 1:30 / progress: lp(5lb) / each leg
 Standing Calf Raise / 3x10-12 / rest 1:00 / progress: dp(10lb, 10, 12)
 Pallof Press / 3x10 / rest 1:00 / progress: none / each side
+
+### Tue · Easy run
+Run / 35-50 min / conversational Zone 2, should feel restorative; finish with 10 min mobility
 
 ### Wed · Upper body & rotation
 Medicine Ball Rotational Throw / 3x5 / rest 1:30 / progress: none / each side
@@ -183,6 +221,12 @@ Copenhagen Plank / 2x25s / bw / rest 1:00 / progress: none / each side
 Seated Calf Raise / 3x12 / rest 1:00 / progress: lp(10lb)
 Cable Chop / 2x10 / rest 1:00 / progress: lp(5lb) / each side
 
+### Sat · Sport or easy run
+Sport / 60-90 min / tennis or soccer, or an easy 50–75 min run instead; competitive soccer counts as a hard session
+
+### Sun · Rest
+Rest / walk or easy yoga if you like
+
 ## Week 12
 // Taper: volume down 30–50%. Reassess strength with submax sets; time a 10–20 m sprint only if safe.
 
@@ -193,6 +237,9 @@ Romanian Deadlift / 2x6 / rest 2:00 / progress: none
 Bulgarian Split Squat / 1x8 / progress: none / each leg
 Standing Calf Raise / 1x12 / progress: none
 Pallof Press / 1x10 / progress: none / each side
+
+### Tue · Easy run
+Run / 35-50 min / conversational Zone 2, should feel restorative; finish with 10 min mobility
 
 ### Wed · Upper body & rotation (taper)
 Medicine Ball Rotational Throw / 2x5 / rest 1:30 / progress: none / each side
@@ -215,3 +262,9 @@ Lateral Lunge / 1x8 / progress: none / each side
 Single-Leg Romanian Deadlift / 1x8 / progress: none / each side
 Copenhagen Plank / 1x25s / bw / progress: none / each side
 Seated Calf Raise / 1x12 / progress: none
+
+### Sat · Sport or easy run
+Sport / 60-90 min / tennis or soccer, or an easy 50–75 min run instead; competitive soccer counts as a hard session
+
+### Sun · Rest
+Rest / walk or easy yoga if you like

@@ -301,3 +301,36 @@ export function fmtDuration(sec: number): string {
   const m = Math.round((sec % 3600) / 60);
   return h ? `${h}h ${m}m` : `${m} min`;
 }
+
+/**
+ * Swap the remaining sets of an exercise for a different one (equipment taken, something hurts).
+ * Sets already done stay logged under the original exercise.
+ */
+export async function swapExercise(workoutId: number, order: number, newName: string): Promise<void> {
+  const group = (await db.sets.where('workoutId').equals(workoutId).toArray()).filter((s) => s.order === order).sort((a, b) => a.setIndex - b.setIndex);
+  if (!group.length || group[0].exerciseName === newName) return;
+  const ex = await db.exercises.where('name').equals(newName).first();
+  const prev = (await lastSetsFor(newName)).filter((s) => s.type !== 'warmup');
+  const remaining = group.filter((s) => !s.done && s.type !== 'warmup');
+  const staleWarmups = group.filter((s) => !s.done && s.type === 'warmup');
+  // If some sets are already done, the new exercise becomes its own block right after.
+  const newOrder = group.some((s) => s.done) ? order + (Number.isInteger(order) ? 0.5 : 0.25) : order;
+  await db.transaction('rw', db.sets, async () => {
+    await db.sets.bulkDelete(staleWarmups.map((s) => s.id!));
+    for (const [i, s] of remaining.entries()) {
+      await db.sets.update(s.id!, {
+        exerciseName: newName,
+        order: newOrder,
+        setIndex: i,
+        weight: undefined,
+        reps: undefined,
+        rpe: undefined,
+        note: undefined,
+        targetWeight: (prev[i] ?? prev[prev.length - 1])?.weight,
+        timed: ex?.type === 'time' ? true : undefined,
+        restSec: s.restSec ?? ex?.defaultRest,
+        progressionKind: undefined,
+      });
+    }
+  });
+}

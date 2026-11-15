@@ -1,4 +1,4 @@
-import { db, type Exercise, type PlanWeek, type Program } from './db';
+import { db, type Exercise, type PlanCardio, type PlanWeek, type Program } from './db';
 import { parsePlan, serializePlan, weekBlockFor } from './plan-parser';
 
 /** Names in the plan that aren't in the exercise library (case-insensitive). */
@@ -106,4 +106,30 @@ export function planLength(p: Program): number {
 /** Save an edited plan structure and regenerate its text so the two never disagree. */
 export async function saveProgramWeeks(id: number, name: string, weeks: PlanWeek[], units: string): Promise<void> {
   await db.programs.update(id, { weeks, sourceText: serializePlan(name, weeks, units) });
+}
+
+/** "35–50 min" for a cardio day, or '' when the plan gives no duration. */
+export function cardioMinutes(c: PlanCardio): string {
+  if (c.minMin === undefined) return '';
+  return c.maxMin !== undefined && c.maxMin !== c.minMin ? `${c.minMin}–${c.maxMin} min` : `${c.minMin} min`;
+}
+
+/** Move a plan on to its next day (after a run is logged, a rest day, or a skip). */
+export async function advanceProgram(id: number): Promise<void> {
+  const p = await db.programs.get(id);
+  if (p) await db.programs.update(id, { cursor: advancedCursor(p) });
+}
+
+/**
+ * Replace a plan's contents with a newer built-in version, keeping its place:
+ * the plan stays on the same week and the day with the same name.
+ */
+export async function updateFromTemplate(p: Program, text: string): Promise<void> {
+  const dayName = currentDay(p).day?.name;
+  await saveProgramFromText(text, p.id);
+  const fresh = await db.programs.get(p.id!);
+  if (!fresh) return;
+  const { block } = weekBlockFor(fresh.weeks, fresh.cursor.week);
+  const idx = block.days.findIndex((d) => d.name === dayName);
+  if (idx >= 0) await db.programs.update(p.id!, { cursor: { week: fresh.cursor.week, day: idx } });
 }

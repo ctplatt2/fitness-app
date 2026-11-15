@@ -2,6 +2,7 @@ import { route } from 'preact-router';
 import { useEffect, useState } from 'preact/hooks';
 import { ACTIVITIES, describeEffort, formatDuration, parseDuration } from '../lib/cardio';
 import { db, getSettings, type Cardio, type CardioActivity } from '../lib/db';
+import { advanceProgram, currentDay } from '../lib/programs';
 import { useLive } from '../lib/use-live';
 import { BASE } from '../base';
 
@@ -14,7 +15,11 @@ function toLocalInput(ts: number): string {
 export function CardioEntry(props: { path?: string; id?: string }) {
   const editingId = props.id ? Number(props.id) : undefined;
   const settings = useLive(() => getSettings());
-  const [activity, setActivity] = useState<CardioActivity>('run');
+  // Opened from a plan day: ?activity=run&plan=<id>
+  const query = new URLSearchParams(location.search);
+  const planId = !editingId && query.get('plan') ? Number(query.get('plan')) : undefined;
+  const preset = ACTIVITIES.find((a) => a.id === query.get('activity'))?.id;
+  const [activity, setActivity] = useState<CardioActivity>(preset ?? 'run');
   const [when, setWhen] = useState(toLocalInput(Date.now()));
   const [duration, setDuration] = useState('');
   const [distance, setDistance] = useState('');
@@ -58,6 +63,12 @@ export function CardioEntry(props: { path?: string; id?: string }) {
     };
     if (editingId) await db.cardio.update(editingId, row);
     else await db.cardio.add(row);
+    if (planId) {
+      // Only move the plan on if it is still sitting on a cardio day.
+      const p = await db.programs.get(planId);
+      if (p && currentDay(p).day?.cardio) await advanceProgram(planId);
+      return route(`${BASE}/`, true);
+    }
     route(`${BASE}/history`, true);
   }
 
@@ -113,6 +124,7 @@ export function CardioEntry(props: { path?: string; id?: string }) {
         )}
       </div>
 
+      {planId && <p class="muted small-text">Saving this also moves your plan on to the next day.</p>}
       <button class="btn primary block" disabled={!canSave} onClick={save}>
         {editingId ? 'Save changes' : 'Save'}
       </button>

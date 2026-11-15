@@ -1,11 +1,12 @@
 import { Link, route } from 'preact-router';
-import { useState } from 'preact/hooks';
+import { useMemo, useState } from 'preact/hooks';
 import { ExercisePicker } from '../components/ExercisePicker';
 import { Sheet } from '../components/Sheet';
 import { db, getSettings, type PlanSlot, type PlanWeek, type Progression } from '../lib/db';
 import { useLive } from '../lib/use-live';
-import { serializePlan, weekBlockFor } from '../lib/plan-parser';
-import { planLength, saveProgramWeeks, setActiveProgram, upcomingDays } from '../lib/programs';
+import { parsePlan, serializePlan, weekBlockFor } from '../lib/plan-parser';
+import { cardioMinutes, planLength, saveProgramWeeks, setActiveProgram, updateFromTemplate, upcomingDays } from '../lib/programs';
+import { TEMPLATES } from '../lib/templates';
 import { BASE } from '../base';
 
 export function describeSlot(s: PlanSlot, units: string): string {
@@ -41,6 +42,15 @@ export function PlanDetail(props: { path?: string; id?: string }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [editing, setEditing] = useState<SlotRef | null>(null);
   const [addingTo, setAddingTo] = useState<{ block: number; day: number } | null>(null);
+  const [confirmUpdate, setConfirmUpdate] = useState(false);
+  // A built-in plan of the same name that has run/sport/rest days this copy lacks.
+  const newer = useMemo(() => {
+    if (!program) return null;
+    const hasExtras = (weeks: PlanWeek[]) => weeks.some((w) => w.days.some((d) => d.cardio || d.rest));
+    if (hasExtras(program.weeks)) return null;
+    const t = TEMPLATES.find((x) => x.name === program.name);
+    return t && hasExtras(parsePlan(t.text).weeks) ? t : null;
+  }, [program]);
 
   if (program === undefined || !settings) return <h1>Plan</h1>;
   if (program === null) {
@@ -121,6 +131,25 @@ export function PlanDetail(props: { path?: string; id?: string }) {
         </div>
       )}
 
+      {newer && (
+        <div class="notice" style="margin-bottom:12px">
+          <div class="small-text">
+            <strong>Update available.</strong> This plan now includes the Tuesday run, Saturday sport or run, and Sunday rest days, so Today can show them.
+            {confirmUpdate && ' Updating replaces any changes you made to this plan\u2019s exercises. Your logged workouts and your place in the plan are kept.'}
+          </div>
+          <div class="chips" style="margin-bottom:0">
+            {confirmUpdate ? (
+              <>
+                <button class="btn small primary" onClick={() => updateFromTemplate(program, newer.text)}>Yes, update</button>
+                <button class="btn small" onClick={() => setConfirmUpdate(false)}>Cancel</button>
+              </>
+            ) : (
+              <button class="btn small primary" onClick={() => setConfirmUpdate(true)}>Update plan</button>
+            )}
+          </div>
+        </div>
+      )}
+
       <p class="muted small-text">Tap an exercise to change it. Changes apply to every week in that block.</p>
 
       {program.weeks.map((w, bi) => {
@@ -140,6 +169,14 @@ export function PlanDetail(props: { path?: string; id?: string }) {
                   </button>
                 ))}
             </div>
+            {d.rest && <p class="muted" style="margin:8px 0 0">Rest day{d.note ? `: ${d.note}` : ''}</p>}
+            {d.cardio && (
+              <p style="margin:8px 0 0">
+                {d.cardio.label}
+                {cardioMinutes(d.cardio) ? ` · ${cardioMinutes(d.cardio)}` : ''}
+                {d.cardio.note && <span class="muted small-text" style="display:block; margin-top:2px">{d.cardio.note}</span>}
+              </p>
+            )}
             <ul class="slots">
               {d.slots.map((s, si) => (
                 <li key={si} class="tappable" onClick={() => setEditing({ block: bi, day: di, slot: si })}>
@@ -158,7 +195,9 @@ export function PlanDetail(props: { path?: string; id?: string }) {
                 </li>
               ))}
             </ul>
-            <button class="btn small block" style="margin-top:8px" onClick={() => setAddingTo({ block: bi, day: di })}>+ Add exercise</button>
+            {!d.rest && !d.cardio && (
+              <button class="btn small block" style="margin-top:8px" onClick={() => setAddingTo({ block: bi, day: di })}>+ Add exercise</button>
+            )}
           </div>
         ));
         return single ? (
