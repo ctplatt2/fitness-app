@@ -1,63 +1,259 @@
 import { useEffect, useState } from 'preact/hooks';
+import { checkBackup, type BackupCheck } from '../lib/backup-format';
+import { parseHistoryCsv } from '../lib/csv-history';
+import { backUpNow, planImport, restoreBackup, runImport, type ImportPlan } from '../lib/data-io';
 import { db, getSettings, type Settings } from '../lib/db';
+import { useLive } from '../lib/use-live';
+
+const fmtDay = (ts: number) => new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 
 export function SettingsPage(_props: { path?: string }) {
-  const [s, setS] = useState<Settings | null>(null);
-  useEffect(() => {
-    getSettings().then(setS);
-  }, []);
-
-  async function setUnits(units: Settings['units']) {
-    if (!s) return;
-    const next: Settings = {
-      ...s,
-      units,
-      barWeight: units === 'kg' ? 20 : 45,
-      plates: units === 'kg' ? [25, 20, 15, 10, 5, 2.5, 1.25] : [45, 35, 25, 10, 5, 2.5],
-    };
-    await db.settings.put(next);
-    setS(next);
-  }
-
+  const s = useLive(() => getSettings());
   if (!s) return <h1>Settings</h1>;
+
+  const save = (patch: Partial<Settings>) => db.settings.put({ ...s, ...patch });
+
   return (
     <>
       <h1>Settings</h1>
+
       <div class="card">
-        <strong>Units</strong>
-        <div style="display:flex; gap:8px; margin-top:8px">
+        <strong>Weight units</strong>
+        <div class="chips" style="margin-bottom:0">
           {(['lb', 'kg'] as const).map((u) => (
-            <button key={u} class={s.units === u ? 'btn primary' : 'btn'} onClick={() => setUnits(u)}>
-              {u}
-            </button>
-          ))}
-        </div>
-        <p class="muted" style="margin:12px 0 0">
-          Bar {s.barWeight} {s.units} · plates {s.plates.join(', ')}
-        </p>
-      </div>
-      <div class="card">
-        <strong>Distance</strong>
-        <div style="display:flex; gap:8px; margin-top:8px">
-          {(['mi', 'km'] as const).map((u) => (
             <button
               key={u}
-              class={s.distanceUnit === u ? 'btn primary' : 'btn'}
-              onClick={async () => {
-                const next = { ...s, distanceUnit: u };
-                await db.settings.put(next);
-                setS(next);
-              }}
+              class={s.units === u ? 'btn primary' : 'btn'}
+              onClick={() =>
+                u !== s.units &&
+                save({ units: u, barWeight: u === 'kg' ? 20 : 45, plates: u === 'kg' ? [25, 20, 15, 10, 5, 2.5, 1.25] : [45, 35, 25, 10, 5, 2.5] })
+              }
             >
               {u}
             </button>
           ))}
         </div>
+        <p class="muted small-text" style="margin:10px 0 0">Switching resets the bar and plates below. It doesn't convert weights you've already logged.</p>
       </div>
+
       <div class="card">
-        <strong>Data</strong>
-        <p class="muted" style="margin:8px 0 0">Backup and restore arrive in phase 6.</p>
+        <strong>Distance units</strong>
+        <div class="chips" style="margin-bottom:0">
+          {(['mi', 'km'] as const).map((u) => (
+            <button key={u} class={s.distanceUnit === u ? 'btn primary' : 'btn'} onClick={() => save({ distanceUnit: u })}>{u}</button>
+          ))}
+        </div>
       </div>
+
+      <Equipment s={s} save={save} />
+      <BackupCard s={s} />
+      <ImportCard s={s} />
     </>
+  );
+}
+
+function Equipment(props: { s: Settings; save: (p: Partial<Settings>) => Promise<unknown> }) {
+  const { s } = props;
+  const [bar, setBar] = useState(String(s.barWeight));
+  const [plates, setPlates] = useState(s.plates.join(', '));
+  const [rest, setRest] = useState(String(s.defaultRest));
+  const [error, setError] = useState('');
+  const [saved, setSaved] = useState(false);
+
+  // Follow outside changes (unit switch, restore).
+  useEffect(() => {
+    setBar(String(s.barWeight));
+    setPlates(s.plates.join(', '));
+    setRest(String(s.defaultRest));
+  }, [s.barWeight, s.plates.join(','), s.defaultRest]);
+
+  const dirty = bar !== String(s.barWeight) || plates !== s.plates.join(', ') || rest !== String(s.defaultRest);
+
+  async function apply() {
+    const b = Number(bar);
+    const r = Number(rest);
+    const list = plates.split(/[,\s]+/).filter(Boolean).map(Number);
+    if (!(b >= 0) || bar.trim() === '') return setError('Bar weight should be a number.');
+    if (list.length === 0 || list.some((p) => !(p > 0))) return setError('Plates should be a list of numbers, like 45, 25, 10, 5, 2.5.');
+    if (!(r >= 0) || rest.trim() === '') return setError('Rest should be a number of seconds.');
+    setError('');
+    await props.save({ barWeight: b, plates: [...new Set(list)].sort((x, y) => y - x), defaultRest: Math.round(r) });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1500);
+  }
+
+  return (
+    <div class="card">
+      <strong>Equipment and rest</strong>
+      <div class="grid2">
+        <label>
+          <span class="muted">Bar weight ({s.units})</span>
+          <input class="input" type="number" inputMode="decimal" step="any" value={bar} onInput={(e) => setBar((e.target as HTMLInputElement).value)} />
+        </label>
+        <label>
+          <span class="muted">Default rest (sec)</span>
+          <input class="input" type="number" inputMode="numeric" value={rest} onInput={(e) => setRest((e.target as HTMLInputElement).value)} />
+        </label>
+      </div>
+      <label style="display:block; margin-top:10px">
+        <span class="muted small-text">Plates you have ({s.units}), separated by commas</span>
+        <input class="input" inputMode="decimal" value={plates} onInput={(e) => setPlates((e.target as HTMLInputElement).value)} />
+      </label>
+      <p class="muted small-text" style="margin:8px 0 0">
+        Used by the plate calculator, warm-up sets, and the smallest weight jump. Default rest applies to exercises with no rest of their own.
+      </p>
+      {error && <p class="err" style="margin:8px 0 0">{error}</p>}
+      <button class="btn small primary" style="margin-top:12px" disabled={!dirty} onClick={apply}>{saved ? 'Saved' : 'Save'}</button>
+    </div>
+  );
+}
+
+function BackupCard(props: { s: Settings }) {
+  const [status, setStatus] = useState('');
+  const [pending, setPending] = useState<Extract<BackupCheck, { ok: true }> | null>(null);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  async function backup() {
+    setBusy(true);
+    try {
+      const r = await backUpNow();
+      setStatus(r === 'cancelled' ? '' : r === 'shared' ? 'Backup shared.' : 'Backup file downloaded.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function chosen(e: Event) {
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    setError('');
+    setPending(null);
+    setStatus('');
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(await file.text());
+    } catch {
+      return setError("That file couldn't be read as a backup.");
+    }
+    const check = checkBackup(parsed);
+    if (!check.ok) return setError(check.error);
+    setPending(check);
+  }
+
+  async function restore() {
+    if (!pending) return;
+    setBusy(true);
+    try {
+      await restoreBackup(pending.backup);
+      setPending(null);
+      setStatus('Restored.');
+    } catch (e) {
+      setError(`Restore failed, nothing was changed: ${(e as Error).message}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div class="card">
+      <strong>Backup</strong>
+      <p class="muted small-text" style="margin:6px 0 0">
+        Your data lives only on this device. A backup is one file with everything in it: plans, workouts, cardio, body weight and settings. Save it to Files or iCloud.
+      </p>
+      <p class="small-text" style="margin:8px 0 0">
+        Last backup: {props.s.lastBackup ? fmtDay(props.s.lastBackup) : 'never'}
+      </p>
+      <div class="chips" style="margin-bottom:0">
+        <button class="btn small primary" disabled={busy} onClick={backup}>Back up now</button>
+        <label class="btn small">
+          Restore from file
+          <input type="file" accept=".json,application/json" hidden onChange={chosen} />
+        </label>
+      </div>
+      {status && <p class="ok small-text" style="margin:10px 0 0">{status}</p>}
+      {error && <p class="err small-text" style="margin:10px 0 0">{error}</p>}
+      {pending && (
+        <div class="notice">
+          <div class="small-text">
+            Backup from {fmtDay(pending.backup.exportedAt)}: {pending.counts.workouts} workouts, {pending.counts.cardio} cardio sessions, {pending.counts.programs} plans.
+            Restoring <strong>replaces everything on this device</strong> and can't be undone.
+          </div>
+          <div class="chips" style="margin-bottom:0">
+            <button class="btn small danger" disabled={busy} onClick={restore}>Replace my data</button>
+            <button class="btn small" onClick={() => setPending(null)}>Cancel</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ImportCard(props: { s: Settings }) {
+  const [plan, setPlan] = useState<ImportPlan | null>(null);
+  const [format, setFormat] = useState('');
+  const [error, setError] = useState('');
+  const [status, setStatus] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  async function chosen(e: Event) {
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    setError('');
+    setStatus('');
+    setPlan(null);
+    const parsed = parseHistoryCsv(await file.text(), props.s.units);
+    if (parsed.error) return setError(parsed.error);
+    setFormat(parsed.format === 'hevy' ? 'Hevy' : 'Strong');
+    setPlan(await planImport(parsed.workouts));
+  }
+
+  async function go() {
+    if (!plan) return;
+    setBusy(true);
+    try {
+      await runImport(plan);
+      setStatus(`Imported ${plan.fresh.length} workout${plan.fresh.length === 1 ? '' : 's'}.`);
+      setPlan(null);
+    } catch (e) {
+      setError(`Import failed, nothing was added: ${(e as Error).message}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div class="card">
+      <strong>Import history</strong>
+      <p class="muted small-text" style="margin:6px 0 0">
+        Bring in past workouts from a Strong or Hevy export (a .csv file). This adds to what's here; it never replaces anything.
+      </p>
+      <div class="chips" style="margin-bottom:0">
+        <label class="btn small">
+          Choose CSV file
+          <input type="file" accept=".csv,text/csv" hidden onChange={chosen} />
+        </label>
+      </div>
+      {status && <p class="ok small-text" style="margin:10px 0 0">{status}</p>}
+      {error && <p class="err small-text" style="margin:10px 0 0">{error}</p>}
+      {plan && (
+        <div class="notice">
+          <div class="small-text">
+            {format} export: {plan.fresh.length} new workout{plan.fresh.length === 1 ? '' : 's'} with {plan.sets} sets.
+            {plan.duplicates > 0 && ` ${plan.duplicates} already here will be skipped.`}
+            {plan.newExercises.length > 0 &&
+              ` ${plan.newExercises.length} exercise${plan.newExercises.length === 1 ? '' : 's'} will be added to your library: ${plan.newExercises.slice(0, 6).join(', ')}${plan.newExercises.length > 6 ? '…' : ''}.`}
+          </div>
+          <div class="chips" style="margin-bottom:0">
+            <button class="btn small primary" disabled={busy || plan.fresh.length === 0} onClick={go}>Import</button>
+            <button class="btn small" onClick={() => setPlan(null)}>Cancel</button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

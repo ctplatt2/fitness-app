@@ -353,3 +353,9 @@ input[type="datetime-local"].input { -webkit-appearance: none; appearance: none;
 .hbar-track { display: block; height: 14px; }
 .hbar { display: block; height: 100%; min-width: 4px; background: #0284c7; border-radius: 0 4px 4px 0; }
 .hbar-v { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ---- Phase 6: settings and data ---- */
+.ok { color: var(--success); }
+.notice { margin-top: 12px; padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
+label.btn { cursor: pointer; }
+a.card.reminder { display: flex; flex-direction: column; gap: 4px; text-decoration: none; color: var(--text); border-color: #eab308; }

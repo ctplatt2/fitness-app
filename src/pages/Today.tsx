@@ -12,6 +12,7 @@ export function Today(_props: { path?: string }) {
   const active = useLive(() => getActiveWorkout());
   const settings = useLive(() => getSettings());
   const exerciseCount = useLive(() => db.exercises.count());
+  const loggedCount = useLive(async () => (await db.workouts.count()) + (await db.cardio.count()));
   const [busy, setBusy] = useState(false);
 
   if (program === undefined || active === undefined || !settings) return <h1>Today</h1>;
@@ -80,6 +81,14 @@ export function Today(_props: { path?: string }) {
         )}
         <Link class="btn" style="flex:1" href={`${BASE}/cardio/new`}>Log cardio</Link>
       </div>
+      {(loggedCount ?? 0) >= 3 && (!settings.lastBackup || Date.now() - settings.lastBackup > 14 * 86400000) && (
+        <Link class="card reminder" href={`${BASE}/settings`}>
+          <strong>Back up your data</strong>
+          <span class="muted small-text">
+            {settings.lastBackup ? 'Your last backup was more than two weeks ago.' : "You haven't made a backup yet."} Your log lives only on this device. Tap to back up.
+          </span>
+        </Link>
+      )}
       <p class="muted">{exerciseCount ?? '…'} exercises in your library.</p>
     </>
   );
