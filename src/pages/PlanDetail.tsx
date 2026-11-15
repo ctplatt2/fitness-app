@@ -2,7 +2,7 @@ import { Link, route } from 'preact-router';
 import { useState } from 'preact/hooks';
 import { db, getSettings, type PlanSlot } from '../lib/db';
 import { useLive } from '../lib/use-live';
-import { serializePlan } from '../lib/plan-parser';
+import { serializePlan, weekBlockFor } from '../lib/plan-parser';
 import { setActiveProgram } from '../lib/programs';
 import { BASE } from '../base';
 
@@ -44,6 +44,8 @@ export function PlanDetail(props: { path?: string; id?: string }) {
   }
 
   const units = settings.units;
+  const nextBlock = weekBlockFor(program.weeks, program.cursor.week).block;
+  const nextDay = Math.min(program.cursor.day, Math.max(0, nextBlock.days.length - 1));
 
   async function copyText() {
     const text = program!.sourceText || serializePlan(program!.name, program!.weeks, units);
@@ -86,7 +88,20 @@ export function PlanDetail(props: { path?: string; id?: string }) {
           )}
           {w.days.map((d, di) => (
             <div class="card" key={di}>
-              <strong>{d.name}</strong>
+              <div class="row-between">
+                <strong>{d.name}</strong>
+                {program.active &&
+                  (w === nextBlock && di === nextDay ? (
+                    <span class="badge">Next up</span>
+                  ) : (
+                    <button
+                      class="btn small"
+                      onClick={() => db.programs.update(id, { cursor: { week: w === nextBlock ? program.cursor.week : w.range[0], day: di } })}
+                    >
+                      Set as next
+                    </button>
+                  ))}
+              </div>
               <ul class="slots">
                 {d.slots.map((s, si) => (
                   <li key={si}>

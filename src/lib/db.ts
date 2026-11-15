@@ -75,6 +75,8 @@ export interface Workout {
   programId?: number;
   dayName?: string;
   week?: number;
+  /** Where the plan pointed when this workout started, so deleting it can put the plan back. */
+  cursorBefore?: { week: number; day: number };
   finishedAt?: number;
   durationSec?: number;
   notes?: string;

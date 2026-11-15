@@ -3,7 +3,7 @@ import { useState } from 'preact/hooks';
 import { ACTIVITIES, describeEffort, formatDuration } from '../lib/cardio';
 import { db, getSettings, type Cardio, type Workout, type WorkoutSet } from '../lib/db';
 import { useLive } from '../lib/use-live';
-import { fmtDuration } from '../lib/workouts';
+import { deleteWorkout, fmtDuration } from '../lib/workouts';
 import { BASE } from '../base';
 
 function fmtDate(ts: number): string {
@@ -107,6 +107,11 @@ function WorkoutCard(props: {
   onToggle: () => void;
 }) {
   const { w, count: c, open, sets } = props;
+  const [confirm, setConfirm] = useState(false);
+  const stop = (fn: () => void) => (e: Event) => {
+    e.stopPropagation();
+    fn();
+  };
   return (
     <div class="card tappable" onClick={props.onToggle}>
       <div class="row-between">
@@ -136,6 +141,27 @@ function WorkoutCard(props: {
             <Link href={`${BASE}/workout/${w.id}/summary`} class="muted small-text" onClick={(e: Event) => e.stopPropagation()}>
               View summary →
             </Link>
+          </li>
+          <li>
+            {!confirm ? (
+              <button class="btn small" onClick={stop(() => setConfirm(true))}>Delete workout</button>
+            ) : (
+              <div onClick={(e) => e.stopPropagation()}>
+                <div class="small-text" style="margin-bottom:8px">
+                  Delete this workout and its sets? This can't be undone.
+                  {w.programId ? ' You can also put your plan back on this day so you can do it again.' : ''}
+                </div>
+                <div class="chips" style="margin:0">
+                  {w.programId && (
+                    <button class="btn small danger" onClick={() => deleteWorkout(w.id!, true)}>Delete and redo this day</button>
+                  )}
+                  <button class={w.programId ? 'btn small' : 'btn small danger'} onClick={() => deleteWorkout(w.id!, false)}>
+                    {w.programId ? 'Delete only' : 'Delete'}
+                  </button>
+                  <button class="btn small" onClick={() => setConfirm(false)}>Cancel</button>
+                </div>
+              </div>
+            )}
           </li>
         </ul>
       )}

@@ -108,8 +108,8 @@ export function WorkoutPage(props: { path?: string; id?: string }) {
     if (busy) return;
     setBusy(true);
     restTimer.stop();
-    await finishWorkout(id);
-    route(`${BASE}/workout/${id}/summary`, true);
+    const logged = await finishWorkout(id);
+    route(logged ? `${BASE}/workout/${id}/summary` : `${BASE}/`, true);
   }
   async function onDiscard() {
     restTimer.stop();
@@ -147,7 +147,7 @@ export function WorkoutPage(props: { path?: string; id?: string }) {
             {fmtClock(elapsed)} · {doneCount}/{sets.length} sets
           </div>
         </div>
-        <button class="btn small primary" onClick={() => (undone ? setConfirm('finish') : onFinish())} disabled={busy || sets.length === 0}>
+        <button class="btn small primary" onClick={() => (undone || doneCount === 0 ? setConfirm('finish') : onFinish())} disabled={busy}>
           Finish
         </button>
       </div>
@@ -183,12 +183,16 @@ export function WorkoutPage(props: { path?: string; id?: string }) {
       )}
       {plates !== null && <PlateSheet weight={plates} settings={settings} onClose={() => setPlates(null)} />}
       {confirm === 'finish' && (
-        <Sheet title="Finish workout?" onClose={() => setConfirm(null)}>
+        <Sheet title={doneCount === 0 ? 'Nothing logged yet' : 'Finish workout?'} onClose={() => setConfirm(null)}>
           <p>
-            {undone} set{undone === 1 ? '' : 's'} not marked done will be dropped.
+            {doneCount === 0
+              ? 'No sets are marked done, so this workout won’t be saved and your plan stays on this day.'
+              : `${undone} set${undone === 1 ? '' : 's'} not marked done will be dropped.`}
           </p>
           <div class="chips">
-            <button class="btn primary" onClick={onFinish} disabled={busy}>Finish</button>
+            <button class={doneCount === 0 ? 'btn danger' : 'btn primary'} onClick={onFinish} disabled={busy}>
+              {doneCount === 0 ? 'Discard workout' : 'Finish'}
+            </button>
             <button class="btn" onClick={() => setConfirm(null)}>Keep going</button>
           </div>
         </Sheet>

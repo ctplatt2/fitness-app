@@ -1,6 +1,7 @@
 import { db, getSettings, type PR, type Program, type Workout, type WorkoutSet } from './db';
 import { estimate1RM } from './math';
 import { smallestStep } from './plates';
+import { weekBlockFor } from './plan-parser';
 import { advancedCursor, currentDay } from './programs';
 import { nextTarget, type PerformedSet } from './progression';
 
@@ -52,6 +53,7 @@ export async function startWorkoutFromProgram(program: Program): Promise<number>
     programId: program.id,
     dayName: day.name,
     week,
+    cursorBefore: { ...program.cursor },
   })) as number;
 
   const rows: Omit<WorkoutSet, 'id'>[] = [];
@@ -242,11 +244,42 @@ export async function computePRs(workoutId: number, done: WorkoutSet[]): Promise
   return prs;
 }
 
-/** Finish: drop unfinished sets, record PRs and duration, advance the plan. */
-export async function finishWorkout(id: number): Promise<void> {
+/** The plan position a workout was started from (older workouts are matched by week and day name). */
+export function planCursorFor(p: Program, w: Workout): Program['cursor'] | null {
+  if (w.cursorBefore) return w.cursorBefore;
+  if (w.week === undefined || !w.dayName) return null;
+  const { block } = weekBlockFor(p.weeks, w.week);
+  const day = block.days.findIndex((d) => d.name === w.dayName);
+  return day < 0 ? null : { week: w.week, day };
+}
+
+/** Delete a logged workout. With rewindPlan, the plan goes back to that workout's day. */
+export async function deleteWorkout(id: number, rewindPlan: boolean): Promise<void> {
   const w = await db.workouts.get(id);
-  if (!w || w.finishedAt) return;
+  if (!w) return;
+  await db.transaction('rw', db.sets, db.workouts, db.programs, async () => {
+    await db.sets.where('workoutId').equals(id).delete();
+    await db.workouts.delete(id);
+    if (rewindPlan && w.programId) {
+      const p = await db.programs.get(w.programId);
+      const cursor = p ? planCursorFor(p, w) : null;
+      if (p && cursor) await db.programs.update(p.id!, { cursor });
+    }
+  });
+}
+
+/**
+ * Finish: drop unfinished sets, record PRs and duration, advance the plan.
+ * A workout with nothing marked done is discarded instead (returns false).
+ */
+export async function finishWorkout(id: number): Promise<boolean> {
+  const w = await db.workouts.get(id);
+  if (!w || w.finishedAt) return true;
   const sets = await db.sets.where('workoutId').equals(id).toArray();
+  if (!sets.some((s) => s.done)) {
+    await discardWorkout(id);
+    return false;
+  }
   await db.sets.bulkDelete(sets.filter((s) => !s.done).map((s) => s.id!));
   const done = sets.filter((s) => s.done);
   const prs = await computePRs(id, done);
@@ -256,6 +289,7 @@ export async function finishWorkout(id: number): Promise<void> {
     const p = await db.programs.get(w.programId);
     if (p) await db.programs.update(p.id!, { cursor: advancedCursor(p) });
   }
+  return true;
 }
 
 export function workoutVolume(sets: WorkoutSet[]): number {
