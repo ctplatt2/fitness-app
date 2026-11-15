@@ -35,3 +35,23 @@ describe('matchesPlanCardio', () => {
     expect(matchesPlanCardio({ activity: 'mobility' }, { activity: 'other', label: 'Sport' })).toBe(false);
   });
 });
+
+import { checkpointForWeek, checkpointsFor } from '../components/CheckIns';
+import { latestPerPlan } from './workouts';
+
+describe('check-ins', () => {
+  it('sit at the start, middle and end of the plan', () => {
+    expect(checkpointsFor(12).map((c) => c.week)).toEqual([1, 6, 12]);
+    expect(checkpointsFor(8).map((c) => c.label)).toEqual(['Baseline', 'Week 4', 'Week 8']);
+    expect(checkpointsFor(1).map((c) => c.week)).toEqual([1, 6, 12]);
+    expect(checkpointForWeek(4, 8)).toBe('wk6');
+    expect(checkpointForWeek(6, 8)).toBeNull();
+  });
+});
+
+describe('latestPerPlan', () => {
+  it('picks the newest finished workout of each plan', () => {
+    const w = (id: number, programId: number | undefined, date: number) => ({ id, programId, date, finishedAt: date + 1 });
+    expect([...latestPerPlan([w(1, 7, 10), w(2, 7, 30), w(3, 7, 20), w(4, 8, 5), w(5, undefined, 99), { id: 6, programId: 7, date: 50 }])].sort()).toEqual([2, 4]);
+  });
+});

@@ -161,7 +161,7 @@ export interface Settings {
   mobility: string[];
   /** How many circuits a week to aim for. */
   mobilityTarget: number;
-  /** Check-in test names, measured at baseline, week 6 and week 12. */
+  /** Check-in test names, measured at the start, middle and end of a plan. */
   testMetrics: string[];
   /** Recorded results, keyed `${metric}|${checkpoint}`. */
   testValues: Record<string, string>;

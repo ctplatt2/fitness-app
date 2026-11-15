@@ -15,6 +15,12 @@ async function finishedWorkoutIds(): Promise<Set<number>> {
   return new Set(ws.map((w) => w.id!));
 }
 
+/** Finished workouts that started before `before`. */
+async function finishedBefore(before: number): Promise<Set<number>> {
+  const ws = await db.workouts.filter((w) => !!w.finishedAt && w.date < before).toArray();
+  return new Set(ws.map((w) => w.id!));
+}
+
 /**
  * Done sets from the most recent finished workout that included this exercise.
  * With `progressedOnly`, deload sessions (progression "none") are skipped so a
@@ -215,8 +221,9 @@ export async function discardWorkout(id: number): Promise<void> {
   });
 }
 
-export async function computePRs(workoutId: number, done: WorkoutSet[]): Promise<PR[]> {
-  const finished = await finishedWorkoutIds();
+/** Records set in a workout, judged against finished workouts before it (all of them when `before` is omitted). */
+export async function computePRs(workoutId: number, done: WorkoutSet[], before?: number): Promise<PR[]> {
+  const finished = before === undefined ? await finishedWorkoutIds() : await finishedBefore(before);
   finished.delete(workoutId);
   const prs: PR[] = [];
   const names = [...new Set(done.map((s) => s.exerciseName))];
@@ -258,6 +265,7 @@ export function planCursorFor(p: Program, w: Workout): Program['cursor'] | null 
 export async function deleteWorkout(id: number, rewindPlan: boolean): Promise<void> {
   const w = await db.workouts.get(id);
   if (!w) return;
+  const names = new Set((await db.sets.where('workoutId').equals(id).toArray()).map((s) => s.exerciseName));
   await db.transaction('rw', db.sets, db.workouts, db.programs, async () => {
     await db.sets.where('workoutId').equals(id).delete();
     await db.workouts.delete(id);
@@ -266,7 +274,25 @@ export async function deleteWorkout(id: number, rewindPlan: boolean): Promise<vo
       const cursor = p ? planCursorFor(p, w) : null;
       if (p && cursor) await db.programs.update(p.id!, { cursor });
     }
+    // Later workouts may have been judged against the one just deleted: redo their records.
+    const later = await db.workouts.filter((x) => !!x.finishedAt && x.date > w.date).toArray();
+    for (const x of later) {
+      const done = (await db.sets.where('workoutId').equals(x.id!).toArray()).filter((s) => s.done);
+      if (!done.some((s) => names.has(s.exerciseName))) continue;
+      await db.workouts.update(x.id!, { prs: await computePRs(x.id!, done, x.date) });
+    }
   });
+}
+
+/** The newest finished workout of each plan: the only one "delete and redo" makes sense for. */
+export function latestPerPlan(workouts: Workout[]): Set<number> {
+  const best = new Map<number, Workout>();
+  for (const w of workouts) {
+    if (!w.programId || !w.finishedAt) continue;
+    const cur = best.get(w.programId);
+    if (!cur || w.date > cur.date) best.set(w.programId, w);
+  }
+  return new Set([...best.values()].map((w) => w.id!));
 }
 
 /**
@@ -309,14 +335,17 @@ export function fmtDuration(sec: number): string {
  * Sets already done stay logged under the original exercise.
  */
 export async function swapExercise(workoutId: number, order: number, newName: string): Promise<void> {
-  const group = (await db.sets.where('workoutId').equals(workoutId).toArray()).filter((s) => s.order === order).sort((a, b) => a.setIndex - b.setIndex);
+  const all = await db.sets.where('workoutId').equals(workoutId).toArray();
+  const group = all.filter((s) => s.order === order).sort((a, b) => a.setIndex - b.setIndex);
   if (!group.length || group[0].exerciseName === newName) return;
+  const later = all.map((s) => s.order).filter((o) => o > order);
+  const nextOrder = later.length ? Math.min(...later) : order + 1;
   const ex = await db.exercises.where('name').equals(newName).first();
   const prev = (await lastSetsFor(newName)).filter((s) => s.type !== 'warmup');
   const remaining = group.filter((s) => !s.done && s.type !== 'warmup');
   const staleWarmups = group.filter((s) => !s.done && s.type === 'warmup');
   // If some sets are already done, the new exercise becomes its own block right after.
-  const newOrder = group.some((s) => s.done) ? order + (Number.isInteger(order) ? 0.5 : 0.25) : order;
+  const newOrder = group.some((s) => s.done) ? (order + nextOrder) / 2 : order;
   await db.transaction('rw', db.sets, async () => {
     await db.sets.bulkDelete(staleWarmups.map((s) => s.id!));
     for (const [i, s] of remaining.entries()) {

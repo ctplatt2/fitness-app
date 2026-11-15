@@ -21,7 +21,13 @@ let trackUrl = '';
 
 function load(): TimerState | null {
   try {
-    return JSON.parse(localStorage.getItem(KEY) || 'null');
+    const saved: TimerState | null = JSON.parse(localStorage.getItem(KEY) || 'null');
+    // A rest that ended while the app was closed is old news: don't sound it on reopening.
+    if (saved && Date.now() - saved.endsAt > LINGER_MS) {
+      localStorage.removeItem(KEY);
+      return null;
+    }
+    return saved;
   } catch {
     return null;
   }

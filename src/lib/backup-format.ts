@@ -6,6 +6,8 @@ export interface Backup {
   version: 1;
   exportedAt: number;
   data: Record<TableName, unknown[]>;
+  /** Strava activity ids deleted on purpose, so a sync after restoring doesn't bring them back. Never credentials. */
+  stravaIgnored?: number[];
 }
 
 export type BackupCheck = { ok: true; backup: Backup; counts: Record<TableName, number> } | { ok: false; error: string };

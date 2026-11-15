@@ -7,7 +7,7 @@ import { advanceProgram, cardioMinutes, currentDay, getActiveProgram, isPlanComp
 import { dayStart } from '../lib/stats';
 import { getStrava, isConnected, syncStrava } from '../lib/strava';
 import { getActiveWorkout, startEmptyWorkout, startWorkoutFromProgram } from '../lib/workouts';
-import { CHECKPOINTS, checkpointForWeek, missingTests } from '../components/CheckIns';
+import { checkpointForWeek, checkpointsFor, missingTests } from '../components/CheckIns';
 import { mobilityThisWeek } from './Mobility';
 import { describeSlot } from './PlanDetail';
 import { BASE } from '../base';
@@ -41,7 +41,8 @@ export function Today(_props: { path?: string }) {
   const day = next?.day;
   const hasLifts = !!day && day.slots.length > 0;
   // After the last week, keep prompting for the final check-in until it's recorded.
-  const checkpoint = complete ? 'wk12' : next ? checkpointForWeek(next.week) : null;
+  const planWeeks = program ? planLength(program) : undefined;
+  const checkpoint = complete ? 'wk12' : next ? checkpointForWeek(next.week, planWeeks) : null;
   // A run (or ride, sport…) already logged or imported today that fits this plan day.
   const already = day?.cardio && !hasLifts ? (todaysCardio ?? []).filter((c) => matchesPlanCardio(c, day.cardio!)).sort((a, b) => b.date - a.date)[0] : undefined;
   const testsDue = checkpoint ? missingTests(settings, checkpoint) : 0;
@@ -185,7 +186,7 @@ export function Today(_props: { path?: string }) {
 
       {checkpoint && testsDue > 0 && (
         <Link class="card reminder" href={`${BASE}/progress?show=checkins`}>
-          <strong>{CHECKPOINTS.find((c) => c.id === checkpoint)!.label} check-in</strong>
+          <strong>{checkpointsFor(planWeeks).find((c) => c.id === checkpoint)!.label} check-in</strong>
           <span class="muted small-text">
             {testsDue} test{testsDue === 1 ? '' : 's'} to record this week so you can compare later. Tap to enter them.
           </span>

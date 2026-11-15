@@ -7,9 +7,23 @@ export const CHECKPOINTS = [
 ] as const;
 export type CheckpointId = (typeof CHECKPOINTS)[number]['id'];
 
+/**
+ * The three check-ins for a plan of `planWeeks` weeks: the start, the middle and the end.
+ * (The ids are storage keys from the original 12-week layout.) Plans without a set length use 12.
+ */
+export function checkpointsFor(planWeeks?: number): { id: CheckpointId; label: string; week: number }[] {
+  const len = planWeeks && planWeeks > 1 ? planWeeks : 12;
+  const mid = Math.max(1, Math.round(len / 2));
+  return [
+    { id: 'base', label: 'Baseline', week: 1 },
+    { id: 'wk6', label: `Week ${mid}`, week: mid },
+    { id: 'wk12', label: `Week ${len}`, week: len },
+  ];
+}
+
 /** Which check-in a plan week calls for, if any. */
-export function checkpointForWeek(week: number): CheckpointId | null {
-  return week === 1 ? 'base' : week === 6 ? 'wk6' : week === 12 ? 'wk12' : null;
+export function checkpointForWeek(week: number, planWeeks?: number): CheckpointId | null {
+  return checkpointsFor(planWeeks).find((c) => c.week === week)?.id ?? null;
 }
 
 /** Tests still blank for a checkpoint (ones marked optional don't count). */
@@ -18,8 +32,9 @@ export function missingTests(s: Settings, cp: CheckpointId): number {
 }
 
 /** Baseline, week 6 and week 12 results side by side. Type a result and it saves. */
-export function CheckIns(props: { settings: Settings; current?: CheckpointId | null }) {
+export function CheckIns(props: { settings: Settings; current?: CheckpointId | null; planWeeks?: number }) {
   const s = props.settings;
+  const points = checkpointsFor(props.planWeeks);
   const save = (key: string, value: string) => {
     const testValues = { ...s.testValues };
     if (value.trim()) testValues[key] = value.trim();
@@ -30,14 +45,14 @@ export function CheckIns(props: { settings: Settings; current?: CheckpointId | n
     <div class="card" id="checkins">
       <strong>Check-in tests</strong>
       <p class="muted small-text" style="margin:4px 0 0">
-        Record these at the start, week 6 and week 12 to see what changed. Don't test sprints while sore or tired.
+        Record these at the start, in {points[1].label.toLowerCase()} and in {points[2].label.toLowerCase()} to see what changed. Don't test sprints while sore or tired.
       </p>
       {s.testMetrics.length === 0 && <p class="muted small-text">No tests listed. Add some in Settings.</p>}
       {s.testMetrics.map((m) => (
         <div key={m} class="checkin">
           <div class="small-text">{m}</div>
           <div class="grid3" style="margin-top:4px">
-            {CHECKPOINTS.map((cp) => {
+            {points.map((cp) => {
               const key = `${m}|${cp.id}`;
               return (
                 <label key={cp.id}>

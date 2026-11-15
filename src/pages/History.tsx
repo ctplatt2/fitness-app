@@ -3,13 +3,15 @@ import { useState } from 'preact/hooks';
 import { ACTIVITIES, describeEffort, formatDuration } from '../lib/cardio';
 import { db, getSettings, type Cardio, type Workout, type WorkoutSet } from '../lib/db';
 import { useLive } from '../lib/use-live';
-import { deleteWorkout, fmtDuration } from '../lib/workouts';
+import { deleteWorkout, fmtDuration, latestPerPlan } from '../lib/workouts';
 import { FEEL } from './WorkoutSummary';
 import { BASE } from '../base';
 
 function fmtDate(ts: number): string {
   return new Date(ts).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 }
+
+const PAGE = 60;
 
 type Entry = { kind: 'workout'; date: number; w: Workout } | { kind: 'cardio'; date: number; c: Cardio };
 
@@ -18,6 +20,7 @@ export function History(_props: { path?: string }) {
   const cardio = useLive(() => db.cardio.toArray());
   const settings = useLive(() => getSettings());
   const [open, setOpen] = useState<number | null>(null);
+  const [limit, setLimit] = useState(PAGE);
   const sets = useLive<WorkoutSet[]>(() => (open ? db.sets.where('workoutId').equals(open).toArray() : Promise.resolve([])), [open]);
   const counts = useLive(async () => {
     const all = await db.sets.toArray();
@@ -36,10 +39,12 @@ export function History(_props: { path?: string }) {
     ...workouts.map((w): Entry => ({ kind: 'workout', date: w.date, w })),
     ...cardio.map((c): Entry => ({ kind: 'cardio', date: c.date, c })),
   ].sort((a, b) => b.date - a.date);
+  const total = entries.length;
+  const redoable = latestPerPlan(workouts);
 
   // Group by calendar day so a lift and a run on the same day sit together.
   const days: { label: string; items: Entry[] }[] = [];
-  for (const e of entries) {
+  for (const e of entries.slice(0, limit)) {
     const label = fmtDate(e.date);
     const last = days[days.length - 1];
     if (last && last.label === label) last.items.push(e);
@@ -68,12 +73,18 @@ export function History(_props: { path?: string }) {
                   count={counts?.[e.w.id!]}
                   open={open === e.w.id}
                   sets={open === e.w.id ? sets : undefined}
+                  canRedo={redoable.has(e.w.id!)}
                   onToggle={() => setOpen(open === e.w.id ? null : e.w.id!)}
                 />
               ),
             )}
           </section>
         ))
+      )}
+      {total > limit && (
+        <button class="btn block" style="margin-top:8px" onClick={() => setLimit(limit + PAGE)}>
+          Show older ({total - limit} more)
+        </button>
       )}
     </>
   );
@@ -105,11 +116,14 @@ function WorkoutCard(props: {
   w: Workout;
   count?: { sets: number; exercises: Set<string> };
   open: boolean;
+  /** The plan can go back to this day (only offered for its most recent workout). */
+  canRedo: boolean;
   sets?: WorkoutSet[];
   onToggle: () => void;
 }) {
   const { w, count: c, open, sets } = props;
   const [confirm, setConfirm] = useState(false);
+  const redo = !!w.programId && props.canRedo;
   const stop = (fn: () => void) => (e: Event) => {
     e.stopPropagation();
     fn();
@@ -158,14 +172,14 @@ function WorkoutCard(props: {
               <div onClick={(e) => e.stopPropagation()}>
                 <div class="small-text" style="margin-bottom:8px">
                   Delete this workout and its sets? This can't be undone.
-                  {w.programId ? ' You can also put your plan back on this day so you can do it again.' : ''}
+                  {redo ? ' You can also put your plan back on this day so you can do it again.' : ''}
                 </div>
                 <div class="chips" style="margin:0">
-                  {w.programId && (
+                  {redo && (
                     <button class="btn small danger" onClick={() => deleteWorkout(w.id!, true)}>Delete and redo this day</button>
                   )}
-                  <button class={w.programId ? 'btn small' : 'btn small danger'} onClick={() => deleteWorkout(w.id!, false)}>
-                    {w.programId ? 'Delete only' : 'Delete'}
+                  <button class={redo ? 'btn small' : 'btn small danger'} onClick={() => deleteWorkout(w.id!, false)}>
+                    {redo ? 'Delete only' : 'Delete'}
                   </button>
                   <button class="btn small" onClick={() => setConfirm(false)}>Cancel</button>
                 </div>

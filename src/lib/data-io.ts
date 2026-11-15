@@ -4,10 +4,21 @@ import { db, getSettings, type DistanceUnit, type Units, type WorkoutSet } from 
 import { serializePlan } from './plan-parser';
 import { EQUIPMENT, convertDistance, convertPlanWeeks, convertWeight } from './units';
 
+const IGNORED_KEY = 'liftlog.strava.ignored';
+
+function readIgnored(): number[] {
+  try {
+    const ids = JSON.parse(localStorage.getItem(IGNORED_KEY) || '[]');
+    return Array.isArray(ids) ? ids.filter((n) => typeof n === 'number') : [];
+  } catch {
+    return [];
+  }
+}
+
 export async function buildBackup(): Promise<Backup> {
   const data = {} as Backup['data'];
   for (const t of TABLES) data[t] = await db.table(t).toArray();
-  return { app: 'liftlog', version: 1, exportedAt: Date.now(), data };
+  return { app: 'liftlog', version: 1, exportedAt: Date.now(), data, stravaIgnored: readIgnored() };
 }
 
 /** Replace everything on this device with the backup's contents. */
@@ -18,6 +29,12 @@ export async function restoreBackup(b: Backup): Promise<void> {
       if (b.data[t].length) await db.table(t).bulkAdd(b.data[t]);
     }
   });
+  try {
+    const ids = [...new Set([...readIgnored(), ...(Array.isArray(b.stravaIgnored) ? b.stravaIgnored : [])])].filter((n) => typeof n === 'number');
+    if (ids.length) localStorage.setItem(IGNORED_KEY, JSON.stringify(ids.slice(-500)));
+  } catch {
+    /* storage unavailable */
+  }
 }
 
 /** Hand a file to the share sheet (Files, iCloud, AirDrop…) or download it where sharing isn't available. */

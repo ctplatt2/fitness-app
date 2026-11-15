@@ -4,7 +4,7 @@ import { CheckIns, checkpointForWeek } from '../components/CheckIns';
 import { ExerciseHistory } from '../components/ExerciseHistory';
 import { formatDuration } from '../lib/cardio';
 import { db, getSettings } from '../lib/db';
-import { currentDay, getActiveProgram, isPlanComplete } from '../lib/programs';
+import { currentDay, getActiveProgram, isPlanComplete, planLength } from '../lib/programs';
 import { addWeeks, bestLifts, dayStart, exerciseSeries, weekStart, weekStreak, weeklyCardio, weeklyMuscleSets } from '../lib/stats';
 import { useLive } from '../lib/use-live';
 
@@ -23,6 +23,7 @@ export function Progress(_props: { path?: string }) {
   const [metric, setMetric] = useState<Metric>('e1rm');
   const [weekOffset, setWeekOffset] = useState(0);
   const [bw, setBw] = useState('');
+  const [cardioMetric, setCardioMetric] = useState<'time' | 'run'>('time');
 
   const workouts = useMemo(() => (workoutsAll ?? []).filter((w) => w.finishedAt), [workoutsAll]);
   const bests = useMemo(() => bestLifts(sets ?? [], workouts), [sets, workouts]);
@@ -39,17 +40,18 @@ export function Progress(_props: { path?: string }) {
   // Mobility circuits are logged alongside cardio but tracked separately.
   const cardio = cardioAll.filter((c) => c.activity !== 'mobility');
   const mobilityDays = new Set(cardioAll.filter((c) => c.activity === 'mobility').map((c) => dayStart(c.date)));
-  const checkins = <CheckIns settings={settings} current={!program ? null : isPlanComplete(program) ? 'wk12' : checkpointForWeek(currentDay(program).week)} />;
+  const planWeeks = program ? planLength(program) : undefined;
+  const checkins = <CheckIns settings={settings} planWeeks={planWeeks} current={!program ? null : isPlanComplete(program) ? 'wk12' : checkpointForWeek(currentDay(program).week, planWeeks)} />;
 
   const now = Date.now();
   const u = settings.units;
   const du = settings.distanceUnit;
-  const sessionDates = [...workouts.map((w) => w.date), ...cardioAll.map((c) => c.date)];
+  const sessionDates = [...workouts.map((w) => w.date), ...cardio.map((c) => c.date)];
   const thisWeek = weekStart(now);
   const sessionsThisWeek = sessionDates.filter((d) => d >= thisWeek).length;
   const streak = weekStreak(sessionDates, now);
 
-  if (sessionDates.length === 0 && body.length === 0) {
+  if (sessionDates.length === 0 && body.length === 0 && cardioAll.length === 0) {
     return (
       <>
         <h1>Progress</h1>
@@ -88,9 +90,11 @@ export function Progress(_props: { path?: string }) {
   const maxMuscle = Math.max(1, ...muscles.map((m) => m.sets));
 
   // --- cardio ---
-  const cardioWeeks = weeklyCardio(cardio, 8, now);
-  const hasDistance = cardioWeeks.some((w) => w.distance > 0);
-  const runs = cardio.filter((c) => c.activity === 'run' && c.distance && c.distance > 0).sort((a, b) => a.date - b.date).slice(-12);
+  const allRuns = cardio.filter((c) => c.activity === 'run' && c.distance && c.distance > 0);
+  const runs = [...allRuns].sort((a, b) => a.date - b.date).slice(-12);
+  // Minutes compare fairly across runs, rides and sport; distance only means something within one activity.
+  const showRunDistance = cardioMetric === 'run' && allRuns.length > 0;
+  const cardioWeeks = weeklyCardio(showRunDistance ? allRuns : cardio, 8, now);
 
   return (
     <>
@@ -201,13 +205,19 @@ export function Progress(_props: { path?: string }) {
 
       {cardio.length > 0 && (
         <div class="card">
-          <strong>Cardio · weekly {hasDistance ? `distance (${du})` : 'time (min)'}</strong>
+          <strong>Cardio · weekly {showRunDistance ? `run distance (${du})` : 'time (min)'}</strong>
+          {allRuns.length > 0 && (
+            <div class="chips">
+              <button class={!showRunDistance ? 'chip active' : 'chip'} onClick={() => setCardioMetric('time')}>All cardio time</button>
+              <button class={showRunDistance ? 'chip active' : 'chip'} onClick={() => setCardioMetric('run')}>Run distance</button>
+            </div>
+          )}
           <SeriesChart
             kind="bar"
             color={CHART_GREEN}
-            label={hasDistance ? `Distance (${du})` : 'Minutes'}
+            label={showRunDistance ? `Run distance (${du})` : 'Minutes'}
             labels={cardioWeeks.map((w) => shortDate(w.start))}
-            values={cardioWeeks.map((w) => (hasDistance ? w.distance : Math.round(w.durationSec / 60)))}
+            values={cardioWeeks.map((w) => (showRunDistance ? w.distance : Math.round(w.durationSec / 60)))}
           />
           {runs.length > 0 && (
             <>
