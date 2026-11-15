@@ -1,9 +1,11 @@
 import { Link, route } from 'preact-router';
 import { useState } from 'preact/hooks';
-import { db, getSettings, type PlanSlot } from '../lib/db';
+import { ExercisePicker } from '../components/ExercisePicker';
+import { Sheet } from '../components/Sheet';
+import { db, getSettings, type PlanSlot, type PlanWeek, type Progression } from '../lib/db';
 import { useLive } from '../lib/use-live';
 import { serializePlan, weekBlockFor } from '../lib/plan-parser';
-import { setActiveProgram } from '../lib/programs';
+import { planLength, saveProgramWeeks, setActiveProgram, upcomingDays } from '../lib/programs';
 import { BASE } from '../base';
 
 export function describeSlot(s: PlanSlot, units: string): string {
@@ -26,12 +28,19 @@ export function progressionLabel(s: PlanSlot, units: string): string {
   return '';
 }
 
+const fmtRest = (sec: number) => `rest ${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+const blockTitle = (w: PlanWeek) => (w.range[0] === w.range[1] ? `Week ${w.range[0]}` : `Weeks ${w.range[0]}–${w.range[1]}`);
+
+type SlotRef = { block: number; day: number; slot: number };
+
 export function PlanDetail(props: { path?: string; id?: string }) {
   const id = Number(props.id);
   const program = useLive(() => db.programs.get(id).then((p) => p ?? null), [id]);
   const settings = useLive(() => getSettings());
   const [copied, setCopied] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [editing, setEditing] = useState<SlotRef | null>(null);
+  const [addingTo, setAddingTo] = useState<{ block: number; day: number } | null>(null);
 
   if (program === undefined || !settings) return <h1>Plan</h1>;
   if (program === null) {
@@ -46,6 +55,15 @@ export function PlanDetail(props: { path?: string; id?: string }) {
   const units = settings.units;
   const nextBlock = weekBlockFor(program.weeks, program.cursor.week).block;
   const nextDay = Math.min(program.cursor.day, Math.max(0, nextBlock.days.length - 1));
+  const coming = upcomingDays(program, 5);
+  const single = program.weeks.length === 1;
+
+  /** Apply a change to a copy of the plan and save it. */
+  async function change(fn: (weeks: PlanWeek[]) => void) {
+    const weeks = structuredClone(program!.weeks);
+    fn(weeks);
+    await saveProgramWeeks(id, program!.name, weeks, units);
+  }
 
   async function copyText() {
     const text = program!.sourceText || serializePlan(program!.name, program!.weeks, units);
@@ -63,6 +81,9 @@ export function PlanDetail(props: { path?: string; id?: string }) {
     route(`${BASE}/plans`, true);
   }
 
+  const editingSlot = editing ? program.weeks[editing.block]?.days[editing.day]?.slots[editing.slot] : undefined;
+  const editingBlock = editing ? program.weeks[editing.block] : undefined;
+
   return (
     <>
       <div class="row-between">
@@ -70,62 +91,88 @@ export function PlanDetail(props: { path?: string; id?: string }) {
         <Link class="btn small" href={`${BASE}/plans`}>Back</Link>
       </div>
       <p class="muted" style="margin:4px 0 16px">
-        {program.active ? `Active · next up: week ${program.cursor.week}, day ${program.cursor.day + 1}` : 'Not active'}
+        {program.active ? `Active · week ${coming[0]?.week ?? 1} of ${planLength(program)}` : 'Not active'}
       </p>
 
       <div class="chips">
         {!program.active && (
           <button class="btn small primary" onClick={() => setActiveProgram(id)}>Make active</button>
         )}
-        <Link class="btn small" href={`${BASE}/plans/${id}/edit`}>Edit text</Link>
+        <Link class="btn small" href={`${BASE}/plans/${id}/edit`}>Edit as text</Link>
         <button class="btn small" onClick={copyText}>{copied ? 'Copied!' : 'Copy as text'}</button>
       </div>
 
-      {program.weeks.map((w) => (
-        <section key={w.range.join('-')}>
-          {!(program.weeks.length === 1 && w.range[0] === 1 && w.range[1] === 1) && (
-            <h2>{w.range[0] === w.range[1] ? `Week ${w.range[0]}` : `Weeks ${w.range[0]}–${w.range[1]}`}</h2>
-          )}
-          {w.days.map((d, di) => (
-            <div class="card" key={di}>
-              <div class="row-between">
-                <strong>{d.name}</strong>
-                {program.active &&
-                  (w === nextBlock && di === nextDay ? (
-                    <span class="badge">Next up</span>
-                  ) : (
-                    <button
-                      class="btn small"
-                      onClick={() => db.programs.update(id, { cursor: { week: w === nextBlock ? program.cursor.week : w.range[0], day: di } })}
-                    >
-                      Set as next
-                    </button>
-                  ))}
-              </div>
-              <ul class="slots">
-                {d.slots.map((s, si) => (
-                  <li key={si}>
-                    <div class="slot-main">
-                      <span>
-                        {s.superset && <span class="ss">{s.superset}</span>}
-                        {s.exerciseName}
-                      </span>
-                      <span class="muted">{describeSlot(s, units)}</span>
-                    </div>
-                    {(progressionLabel(s, units) || s.note || s.rest) && (
-                      <div class="slot-sub muted">
-                        {[progressionLabel(s, units), s.rest ? `rest ${Math.floor(s.rest / 60)}:${String(s.rest % 60).padStart(2, '0')}` : '', s.note]
-                          .filter(Boolean)
-                          .join(' · ')}
-                      </div>
-                    )}
-                  </li>
+      {program.active && coming.length > 0 && (
+        <div class="card active">
+          <strong>Coming up</strong>
+          <ul class="slots">
+            {coming.map((d, i) => (
+              <li key={i}>
+                <div class="slot-main">
+                  <span>
+                    {i === 0 && <span class="ss">Next</span>}
+                    {d.name}
+                  </span>
+                  <span class="muted small-text">week {d.week}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <p class="muted small-text">Tap an exercise to change it. Changes apply to every week in that block.</p>
+
+      {program.weeks.map((w, bi) => {
+        const days = w.days.map((d, di) => (
+          <div class="card" key={di}>
+            <div class="row-between">
+              <strong>{d.name}</strong>
+              {program.active &&
+                (w === nextBlock && di === nextDay ? (
+                  <span class="badge">Next up</span>
+                ) : (
+                  <button
+                    class="btn small"
+                    onClick={() => db.programs.update(id, { cursor: { week: w === nextBlock ? program.cursor.week : w.range[0], day: di } })}
+                  >
+                    Set as next
+                  </button>
                 ))}
-              </ul>
             </div>
-          ))}
-        </section>
-      ))}
+            <ul class="slots">
+              {d.slots.map((s, si) => (
+                <li key={si} class="tappable" onClick={() => setEditing({ block: bi, day: di, slot: si })}>
+                  <div class="slot-main">
+                    <span>
+                      {s.superset && <span class="ss">{s.superset}</span>}
+                      {s.exerciseName}
+                    </span>
+                    <span class="muted">{describeSlot(s, units)} ›</span>
+                  </div>
+                  {(progressionLabel(s, units) || s.note || s.rest) && (
+                    <div class="slot-sub muted">
+                      {[progressionLabel(s, units), s.rest ? fmtRest(s.rest) : '', s.note].filter(Boolean).join(' · ')}
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+            <button class="btn small block" style="margin-top:8px" onClick={() => setAddingTo({ block: bi, day: di })}>+ Add exercise</button>
+          </div>
+        ));
+        return single ? (
+          <section key={bi}>{days}</section>
+        ) : (
+          <details key={bi} class="block-details" open={w === nextBlock || !program.active}>
+            <summary>
+              {blockTitle(w)}
+              {program.active && w === nextBlock && <span class="badge subtle">current</span>}
+            </summary>
+            {days}
+          </details>
+        );
+      })}
 
       <div style="margin-top:24px">
         {confirmDelete ? (
@@ -137,6 +184,145 @@ export function PlanDetail(props: { path?: string; id?: string }) {
           <button class="btn small" onClick={() => setConfirmDelete(true)}>Delete plan</button>
         )}
       </div>
+
+      {editing && editingSlot && editingBlock && (
+        <SlotEditor
+          slot={editingSlot}
+          units={units}
+          scope={single ? '' : blockTitle(editingBlock)}
+          count={program.weeks[editing.block].days[editing.day].slots.length}
+          index={editing.slot}
+          onClose={() => setEditing(null)}
+          onSave={async (next) => {
+            const at = editing;
+            setEditing(null);
+            await change((weeks) => (weeks[at.block].days[at.day].slots[at.slot] = next));
+          }}
+          onRemove={async () => {
+            const at = editing;
+            setEditing(null);
+            await change((weeks) => weeks[at.block].days[at.day].slots.splice(at.slot, 1));
+          }}
+          onMove={async (delta) => {
+            const at = editing;
+            const to = at.slot + delta;
+            setEditing({ ...at, slot: to });
+            await change((weeks) => {
+              const slots = weeks[at.block].days[at.day].slots;
+              [slots[at.slot], slots[to]] = [slots[to], slots[at.slot]];
+            });
+          }}
+        />
+      )}
+      {addingTo && (
+        <ExercisePicker
+          onClose={() => setAddingTo(null)}
+          onPick={async (name) => {
+            const at = addingTo;
+            setAddingTo(null);
+            await change((weeks) => weeks[at.block].days[at.day].slots.push({ exerciseName: name, sets: 3, minReps: 8, maxReps: 8, progression: { kind: 'none' } }));
+            setEditing({ ...at, slot: program.weeks[at.block].days[at.day].slots.length });
+          }}
+        />
+      )}
     </>
+  );
+}
+
+function SlotEditor(props: {
+  slot: PlanSlot;
+  units: string;
+  scope: string;
+  index: number;
+  count: number;
+  onSave: (s: PlanSlot) => void;
+  onRemove: () => void;
+  onMove: (delta: number) => void;
+  onClose: () => void;
+}) {
+  const s = props.slot;
+  const [sets, setSets] = useState(String(s.sets));
+  const [minReps, setMinReps] = useState(String(s.minReps));
+  const [maxReps, setMaxReps] = useState(String(s.maxReps));
+  const [weight, setWeight] = useState(s.weight?.toString() ?? '');
+  const [rest, setRest] = useState(s.rest?.toString() ?? '');
+  const [kind, setKind] = useState<Progression['kind']>(s.progression.kind);
+  const [inc, setInc] = useState(s.progression.kind === 'none' ? '5' : String(s.progression.increment));
+  const [note, setNote] = useState(s.note ?? '');
+  const [error, setError] = useState('');
+
+  function save() {
+    const n = Math.round(Number(sets));
+    const lo = Math.round(Number(minReps));
+    const hi = Math.round(Number(maxReps || minReps));
+    if (!(n >= 1)) return setError('Sets should be 1 or more.');
+    if (!(lo >= 1)) return setError(`${s.timed ? 'Seconds' : 'Reps'} should be 1 or more.`);
+    if (!(hi >= lo)) return setError('The top of the range should be at least the bottom.');
+    const w = weight.trim() === '' ? undefined : Number(weight);
+    if (w !== undefined && !(w >= 0)) return setError('Weight should be a number, or blank.');
+    const r = rest.trim() === '' ? undefined : Math.round(Number(rest));
+    if (r !== undefined && !(r >= 0)) return setError('Rest should be a number of seconds, or blank.');
+    const step = Number(inc);
+    if (kind !== 'none' && !(step >= 0)) return setError('The weight jump should be a number.');
+    const progression: Progression =
+      kind === 'lp' ? { kind: 'lp', increment: step } : kind === 'dp' ? { kind: 'dp', increment: step, minReps: lo, maxReps: hi } : { kind: 'none' };
+    props.onSave({ ...s, sets: n, minReps: lo, maxReps: hi, weight: w, rest: r, progression, note: note.trim() || undefined });
+  }
+
+  const num = (set: (v: string) => void) => (e: Event) => set((e.target as HTMLInputElement).value);
+
+  return (
+    <Sheet title={s.exerciseName} onClose={props.onClose}>
+      {props.scope && <p class="muted small-text" style="margin:0 0 4px">Applies to {props.scope.toLowerCase()}.</p>}
+      <div class="grid3">
+        <label>
+          <span class="muted">Sets</span>
+          <input class="input" type="number" inputMode="numeric" value={sets} onInput={num(setSets)} />
+        </label>
+        <label>
+          <span class="muted">{s.timed ? 'Seconds' : 'Reps'} from</span>
+          <input class="input" type="number" inputMode="numeric" value={minReps} onInput={num(setMinReps)} />
+        </label>
+        <label>
+          <span class="muted">to</span>
+          <input class="input" type="number" inputMode="numeric" value={maxReps} onInput={num(setMaxReps)} />
+        </label>
+      </div>
+      <div class="grid2">
+        <label>
+          <span class="muted">Start weight ({props.units})</span>
+          <input class="input" type="number" inputMode="decimal" step="any" placeholder="blank" value={weight} onInput={num(setWeight)} />
+        </label>
+        <label>
+          <span class="muted">Rest (sec)</span>
+          <input class="input" type="number" inputMode="numeric" placeholder="default" value={rest} onInput={num(setRest)} />
+        </label>
+      </div>
+      <label style="display:block; margin-top:10px">
+        <span class="muted small-text">How it progresses</span>
+        <select class="input" value={kind} onChange={(e) => setKind((e.target as HTMLSelectElement).value as Progression['kind'])}>
+          <option value="none">Stays the same</option>
+          <option value="lp">Add weight when every set hits its reps</option>
+          <option value="dp">Build reps through the range, then add weight</option>
+        </select>
+      </label>
+      {kind !== 'none' && (
+        <label style="display:block; margin-top:10px">
+          <span class="muted small-text">Weight jump ({props.units})</span>
+          <input class="input" type="number" inputMode="decimal" step="any" value={inc} onInput={num(setInc)} />
+        </label>
+      )}
+      <label style="display:block; margin-top:10px">
+        <span class="muted small-text">Note</span>
+        <input class="input" value={note} onInput={num(setNote)} />
+      </label>
+      {error && <p class="err small-text" style="margin:10px 0 0">{error}</p>}
+      <div class="chips" style="margin-top:16px">
+        <button class="btn primary" style="flex:1" onClick={save}>Save</button>
+        <button class="btn small" disabled={props.index === 0} onClick={() => props.onMove(-1)} aria-label="Move up">↑</button>
+        <button class="btn small" disabled={props.index >= props.count - 1} onClick={() => props.onMove(1)} aria-label="Move down">↓</button>
+        <button class="btn small danger" onClick={props.onRemove}>Remove</button>
+      </div>
+    </Sheet>
   );
 }

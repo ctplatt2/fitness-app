@@ -1,5 +1,5 @@
-import { db, type Exercise, type Program } from './db';
-import { parsePlan, weekBlockFor } from './plan-parser';
+import { db, type Exercise, type PlanWeek, type Program } from './db';
+import { parsePlan, serializePlan, weekBlockFor } from './plan-parser';
 
 /** Names in the plan that aren't in the exercise library (case-insensitive). */
 export async function unknownExercises(names: string[]): Promise<string[]> {
@@ -83,4 +83,27 @@ export function advancedCursor(p: Program): Program['cursor'] {
   const { block } = weekBlockFor(p.weeks, p.cursor.week);
   if (p.cursor.day + 1 < block.days.length) return { week: p.cursor.week, day: p.cursor.day + 1 };
   return { week: p.cursor.week + 1, day: 0 };
+}
+
+/** The next n sessions the plan will serve, starting with the one that's up next. */
+export function upcomingDays(p: Program, n: number): { week: number; name: string; exercises: number }[] {
+  const out: { week: number; name: string; exercises: number }[] = [];
+  let cursor = { ...p.cursor };
+  for (let i = 0; i < n; i++) {
+    const at = { ...p, cursor };
+    const { week, day } = currentDay(at);
+    if (!day) break;
+    out.push({ week, name: day.name, exercises: day.slots.length });
+    cursor = advancedCursor(at);
+  }
+  return out;
+}
+
+export function planLength(p: Program): number {
+  return p.weeks.length ? p.weeks[p.weeks.length - 1].range[1] : 0;
+}
+
+/** Save an edited plan structure and regenerate its text so the two never disagree. */
+export async function saveProgramWeeks(id: number, name: string, weeks: PlanWeek[], units: string): Promise<void> {
+  await db.programs.update(id, { weeks, sourceText: serializePlan(name, weeks, units) });
 }
