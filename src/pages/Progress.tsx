@@ -4,7 +4,7 @@ import { CheckIns, checkpointForWeek } from '../components/CheckIns';
 import { ExerciseHistory } from '../components/ExerciseHistory';
 import { formatDuration } from '../lib/cardio';
 import { db, getSettings } from '../lib/db';
-import { currentDay, getActiveProgram } from '../lib/programs';
+import { currentDay, getActiveProgram, isPlanComplete } from '../lib/programs';
 import { addWeeks, bestLifts, dayStart, exerciseSeries, weekStart, weekStreak, weeklyCardio, weeklyMuscleSets } from '../lib/stats';
 import { useLive } from '../lib/use-live';
 
@@ -39,7 +39,7 @@ export function Progress(_props: { path?: string }) {
   // Mobility circuits are logged alongside cardio but tracked separately.
   const cardio = cardioAll.filter((c) => c.activity !== 'mobility');
   const mobilityDays = new Set(cardioAll.filter((c) => c.activity === 'mobility').map((c) => dayStart(c.date)));
-  const checkins = <CheckIns settings={settings} current={program ? checkpointForWeek(currentDay(program).week) : null} />;
+  const checkins = <CheckIns settings={settings} current={!program ? null : isPlanComplete(program) ? 'wk12' : checkpointForWeek(currentDay(program).week)} />;
 
   const now = Date.now();
   const u = settings.units;

@@ -1,6 +1,6 @@
 import { BASE } from '../base';
 import { db, getSettings } from './db';
-import { advanceProgram, currentDay, getActiveProgram } from './programs';
+import { advanceProgram, currentDay, getActiveProgram, isPlanComplete, matchesPlanCardio } from './programs';
 import { mapActivity, planSync, type StravaActivity } from './strava-map';
 
 // Strava details live in this device's local storage only. They are deliberately
@@ -185,11 +185,11 @@ async function runSync(): Promise<SyncResult> {
   // If today's plan day is a cardio session and a matching activity from today just arrived, move the plan on.
   let planAdvanced = false;
   const program = await getActiveProgram();
-  const day = program ? currentDay(program).day : undefined;
+  const day = program && !isPlanComplete(program) ? currentDay(program).day : undefined;
   if (program && day?.cardio && day.slots.length === 0) {
     const today = new Date().toDateString();
     const hit = [...plan.add, ...plan.link.map((l) => mapped.find((m) => m.stravaId === l.patch.stravaId)!)].some(
-      (a) => new Date(a.date).toDateString() === today && (a.activity === day.cardio!.activity || day.cardio!.activity === 'other'),
+      (a) => new Date(a.date).toDateString() === today && matchesPlanCardio(a, day.cardio!),
     );
     if (hit) {
       await advanceProgram(program.id!);

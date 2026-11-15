@@ -17,3 +17,14 @@ export function formatPace(secPerUnit: number | null): string {
   const s = Math.round(secPerUnit % 60);
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
+
+/**
+ * How long a workout lasted, in seconds. Normally start to finish, but if Finish
+ * was tapped long after the last set (the workout was left open), it ends at the
+ * last completed set instead.
+ */
+export function sessionSeconds(start: number, finishedAt: number, doneTimes: number[], idleMs = 30 * 60_000): number {
+  const last = Math.max(0, ...doneTimes.filter((t) => t >= start && t <= finishedAt));
+  const end = last > 0 && finishedAt - last > idleMs ? last : finishedAt;
+  return Math.max(0, Math.round((end - start) / 1000));
+}

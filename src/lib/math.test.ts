@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { estimate1RM, formatPace, paceSecPerUnit } from './math';
+import { sessionSeconds } from './math';
 
 describe('estimate1RM', () => {
   it('returns the weight for a single', () => {
@@ -23,5 +24,19 @@ describe('pace', () => {
   it('handles missing distance', () => {
     expect(paceSecPerUnit(1800, 0)).toBeNull();
     expect(formatPace(null)).toBe('–');
+  });
+});
+
+describe('sessionSeconds', () => {
+  const start = 1_000_000;
+  const min = 60_000;
+  it('runs from start to finish for a normal workout', () => {
+    expect(sessionSeconds(start, start + 50 * min, [start + 45 * min])).toBe(3000);
+  });
+  it('ends at the last set when Finish was tapped much later', () => {
+    expect(sessionSeconds(start, start + 14 * 60 * min, [start + 10 * min, start + 55 * min])).toBe(3300);
+  });
+  it('falls back to start-to-finish when sets have no times', () => {
+    expect(sessionSeconds(start, start + 40 * min, [0, 0])).toBe(2400);
   });
 });

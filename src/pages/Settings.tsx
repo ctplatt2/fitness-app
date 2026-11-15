@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'preact/hooks';
 import { checkBackup, type BackupCheck } from '../lib/backup-format';
 import { parseHistoryCsv } from '../lib/csv-history';
-import { backUpNow, planImport, restoreBackup, runImport, type ImportPlan } from '../lib/data-io';
-import { db, getSettings, type Settings } from '../lib/db';
+import { backUpNow, distanceDataCount, planImport, restoreBackup, runImport, switchDistanceUnit, switchWeightUnits, weightDataCounts, type ImportPlan } from '../lib/data-io';
+import { db, getSettings, type DistanceUnit, type Settings, type Units } from '../lib/db';
+import { Sheet } from '../components/Sheet';
 import { beginConnect, disconnect, finishConnect, getStrava, isConnected, saveApp, syncStrava } from '../lib/strava';
 import { askForNotifications, lockAlarmEnabled, notificationState, setLockAlarm } from '../lib/timer';
 import { useLive } from '../lib/use-live';
@@ -11,9 +12,29 @@ const fmtDay = (ts: number) => new Date(ts).toLocaleDateString(undefined, { mont
 
 export function SettingsPage(_props: { path?: string }) {
   const s = useLive(() => getSettings());
+  const [ask, setAsk] = useState<{ kind: 'weight'; to: Units; detail: string } | { kind: 'distance'; to: DistanceUnit; detail: string } | null>(null);
   if (!s) return <h1>Settings</h1>;
 
   const save = (patch: Partial<Settings>) => db.settings.put({ ...s, ...patch });
+
+  async function pickWeight(u: Units) {
+    if (u === s!.units) return;
+    const n = await weightDataCounts();
+    if (n.sets + n.body + n.plans === 0) return switchWeightUnits(u, false);
+    setAsk({ kind: 'weight', to: u, detail: [n.sets ? `${n.sets} logged set${n.sets === 1 ? '' : 's'}` : '', n.body ? `${n.body} body weight entr${n.body === 1 ? 'y' : 'ies'}` : '', n.plans ? `${n.plans} plan${n.plans === 1 ? '' : 's'}` : ''].filter(Boolean).join(', ') });
+  }
+  async function pickDistance(u: DistanceUnit) {
+    if (u === s!.distanceUnit) return;
+    const n = await distanceDataCount();
+    if (n === 0) return switchDistanceUnit(u, false);
+    setAsk({ kind: 'distance', to: u, detail: `${n} cardio entr${n === 1 ? 'y' : 'ies'} with a distance` });
+  }
+  async function applySwitch(convert: boolean) {
+    if (!ask) return;
+    if (ask.kind === 'weight') await switchWeightUnits(ask.to, convert);
+    else await switchDistanceUnit(ask.to, convert);
+    setAsk(null);
+  }
 
   return (
     <>
@@ -26,26 +47,37 @@ export function SettingsPage(_props: { path?: string }) {
             <button
               key={u}
               class={s.units === u ? 'btn primary' : 'btn'}
-              onClick={() =>
-                u !== s.units &&
-                save({ units: u, barWeight: u === 'kg' ? 20 : 45, plates: u === 'kg' ? [25, 20, 15, 10, 5, 2.5, 1.25] : [45, 35, 25, 10, 5, 2.5] })
-              }
+              onClick={() => pickWeight(u)}
             >
               {u}
             </button>
           ))}
         </div>
-        <p class="muted small-text" style="margin:10px 0 0">Switching resets the bar and plates below. It doesn't convert weights you've already logged.</p>
+        <p class="muted small-text" style="margin:10px 0 0">Switching resets the bar and plates below, and asks whether to convert what you've already logged.</p>
       </div>
 
       <div class="card">
         <strong>Distance units</strong>
         <div class="chips" style="margin-bottom:0">
           {(['mi', 'km'] as const).map((u) => (
-            <button key={u} class={s.distanceUnit === u ? 'btn primary' : 'btn'} onClick={() => save({ distanceUnit: u })}>{u}</button>
+            <button key={u} class={s.distanceUnit === u ? 'btn primary' : 'btn'} onClick={() => pickDistance(u)}>{u}</button>
           ))}
         </div>
       </div>
+
+      {ask && (
+        <Sheet title={`Switch to ${ask.to}?`} onClose={() => setAsk(null)}>
+          <p style="margin-top:0">
+            You have {ask.detail} in {ask.kind === 'weight' ? s.units : s.distanceUnit}. Converting changes those numbers to {ask.to}
+            {ask.kind === 'weight' ? ' (logged weights to the nearest 0.5, plan weights to the nearest 2.5 kg or 5 lb, and 5 lb steps become 2.5 kg)' : ''}. Changing only the label keeps the numbers as they are, which is right if they were really {ask.to} all along.
+          </p>
+          <div class="chips">
+            <button class="btn primary" onClick={() => applySwitch(true)}>Convert to {ask.to}</button>
+            <button class="btn" onClick={() => applySwitch(false)}>Only change the label</button>
+            <button class="btn" onClick={() => setAsk(null)}>Cancel</button>
+          </div>
+        </Sheet>
+      )}
 
       <Equipment s={s} save={save} />
       <AlertsCard />

@@ -2,7 +2,9 @@ import { Link, route } from 'preact-router';
 import { useState } from 'preact/hooks';
 import { db, getSettings } from '../lib/db';
 import { useLive } from '../lib/use-live';
-import { advanceProgram, cardioMinutes, currentDay, getActiveProgram } from '../lib/programs';
+import { formatDuration } from '../lib/cardio';
+import { advanceProgram, cardioMinutes, currentDay, getActiveProgram, isPlanComplete, matchesPlanCardio, planLength } from '../lib/programs';
+import { dayStart } from '../lib/stats';
 import { getStrava, isConnected, syncStrava } from '../lib/strava';
 import { getActiveWorkout, startEmptyWorkout, startWorkoutFromProgram } from '../lib/workouts';
 import { CHECKPOINTS, checkpointForWeek, missingTests } from '../components/CheckIns';
@@ -17,6 +19,7 @@ export function Today(_props: { path?: string }) {
   const exerciseCount = useLive(() => db.exercises.count());
   const loggedCount = useLive(async () => (await db.workouts.count()) + (await db.cardio.count()));
   const mobilityCount = useLive(() => mobilityThisWeek());
+  const todaysCardio = useLive(() => db.cardio.where('date').aboveOrEqual(dayStart(Date.now())).toArray());
   const [busy, setBusy] = useState(false);
   const [stravaMsg, setStravaMsg] = useState('');
   const strava = isConnected(getStrava());
@@ -33,10 +36,14 @@ export function Today(_props: { path?: string }) {
 
   if (program === undefined || active === undefined || !settings) return <h1>Today</h1>;
 
-  const next = program ? currentDay(program) : null;
+  const complete = !!program && isPlanComplete(program);
+  const next = program && !complete ? currentDay(program) : null;
   const day = next?.day;
   const hasLifts = !!day && day.slots.length > 0;
-  const checkpoint = next ? checkpointForWeek(next.week) : null;
+  // After the last week, keep prompting for the final check-in until it's recorded.
+  const checkpoint = complete ? 'wk12' : next ? checkpointForWeek(next.week) : null;
+  // A run (or ride, sport…) already logged or imported today that fits this plan day.
+  const already = day?.cardio && !hasLifts ? (todaysCardio ?? []).filter((c) => matchesPlanCardio(c, day.cardio!)).sort((a, b) => b.date - a.date)[0] : undefined;
   const testsDue = checkpoint ? missingTests(settings, checkpoint) : 0;
 
   async function start(kind: 'plan' | 'empty') {
@@ -58,12 +65,33 @@ export function Today(_props: { path?: string }) {
         <div class="card active">
           <div class="muted small-text">Workout in progress</div>
           <strong style="font-size:1.2rem">{active.dayName ?? 'Workout'}</strong>
-          <div class="muted small-text">started {new Date(active.date).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</div>
+          <div class="muted small-text">
+            started{' '}
+            {dayStart(active.date) === dayStart(Date.now())
+              ? new Date(active.date).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+              : new Date(active.date).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+          </div>
           <Link class="btn primary block" style="margin-top:12px" href={`${BASE}/workout/${active.id}`}>Resume</Link>
         </div>
       )}
 
-      {program && next && day ? (
+      {program && complete ? (
+        <div class="card pr">
+          <div class="muted small-text">{program.name}</div>
+          <strong style="font-size:1.2rem">Plan complete 🎉</strong>
+          <p style="margin:10px 0 0">
+            You finished all {planLength(program)} weeks. Start it again from week 1, or pick a different plan.
+          </p>
+          {!active && (
+            <>
+              <button class="btn primary block" style="margin-top:12px" onClick={() => db.programs.update(program.id!, { cursor: { week: 1, day: 0 } })}>
+                Start again from week 1
+              </button>
+              <Link class="btn block" style="margin-top:8px" href={`${BASE}/plans`}>Choose another plan</Link>
+            </>
+          )}
+        </div>
+      ) : program && next && day ? (
         <div class="card">
           <div class="muted small-text">
             {program.name} · week {next.week}
@@ -101,15 +129,23 @@ export function Today(_props: { path?: string }) {
                   Start {day.name}
                 </button>
               ) : day.cardio ? (
-                <Link class="btn primary block" style="margin-top:12px" href={`${BASE}/cardio/new?activity=${day.cardio.activity}&plan=${program.id}`}>
-                  Log this {day.cardio.label.toLowerCase()}
-                </Link>
+                <>
+                  {already && (
+                    <button class="btn primary block" style="margin-top:12px" onClick={() => advanceProgram(program.id!)}>
+                      Count today's {formatDuration(already.durationSec)}
+                      {already.distance ? ` · ${already.distance} ${settings.distanceUnit}` : ''} {already.activity === 'other' ? 'session' : already.activity}
+                    </button>
+                  )}
+                  <Link class={already ? 'btn block' : 'btn primary block'} style={already ? 'margin-top:8px' : 'margin-top:12px'} href={`${BASE}/cardio/new?activity=${day.cardio.activity}&plan=${program.id}`}>
+                    Log {already ? 'a different' : 'this'} {day.cardio.label.toLowerCase()}
+                  </Link>
+                </>
               ) : (
                 <button class="btn primary block" style="margin-top:12px" onClick={() => advanceProgram(program.id!)}>
                   Rest done, show next day
                 </button>
               )}
-              {strava && day.cardio && !hasLifts && (
+              {strava && day.cardio && !hasLifts && !already && (
                 <>
                   <button class="btn block" style="margin-top:8px" onClick={pullFromStrava}>Get it from Strava</button>
                   {stravaMsg && <p class="muted small-text" style="margin:8px 0 0">{stravaMsg}</p>}

@@ -5,7 +5,7 @@ import { Sheet } from '../components/Sheet';
 import { db, getSettings, type PlanSlot, type PlanWeek, type Progression } from '../lib/db';
 import { useLive } from '../lib/use-live';
 import { parsePlan, serializePlan, weekBlockFor } from '../lib/plan-parser';
-import { cardioMinutes, planLength, saveProgramWeeks, setActiveProgram, updateFromTemplate, upcomingDays } from '../lib/programs';
+import { cardioMinutes, planLength, saveProgramWeeks, setActiveProgram, updateFromTemplate, isPlanComplete, upcomingDays } from '../lib/programs';
 import { TEMPLATES } from '../lib/templates';
 import { BASE } from '../base';
 
@@ -101,7 +101,7 @@ export function PlanDetail(props: { path?: string; id?: string }) {
         <Link class="btn small" href={`${BASE}/plans`}>Back</Link>
       </div>
       <p class="muted" style="margin:4px 0 16px">
-        {program.active ? `Active · week ${coming[0]?.week ?? 1} of ${planLength(program)}` : 'Not active'}
+        {!program.active ? 'Not active' : isPlanComplete(program) ? `Active · all ${planLength(program)} weeks complete` : `Active · week ${coming[0]?.week ?? 1} of ${planLength(program)}`}
       </p>
 
       <div class="chips">
@@ -112,6 +112,13 @@ export function PlanDetail(props: { path?: string; id?: string }) {
         <button class="btn small" onClick={copyText}>{copied ? 'Copied!' : 'Copy as text'}</button>
       </div>
 
+      {program.active && isPlanComplete(program) && (
+        <div class="card active">
+          <strong>Plan complete</strong>
+          <p class="muted small-text" style="margin:6px 0 10px">Every week is done. Start again, or tap "Set as next" on any day below.</p>
+          <button class="btn small primary" onClick={() => db.programs.update(id, { cursor: { week: 1, day: 0 } })}>Start again from week 1</button>
+        </div>
+      )}
       {program.active && coming.length > 0 && (
         <div class="card active">
           <strong>Coming up</strong>

@@ -1,7 +1,7 @@
 import { Link, route } from 'preact-router';
 import { db } from '../lib/db';
 import { useLive } from '../lib/use-live';
-import { planLength, setActiveProgram, upcomingDays } from '../lib/programs';
+import { isPlanComplete, planLength, setActiveProgram, upcomingDays } from '../lib/programs';
 import { BASE } from '../base';
 
 export function Plans(_props: { path?: string }) {
@@ -21,7 +21,7 @@ export function Plans(_props: { path?: string }) {
         <div class="card active tappable" onClick={() => route(`${BASE}/plans/${active.id}`)}>
           <div class="row-between">
             <span class="muted small-text">Active plan</span>
-            <span class="badge">Week {coming[0]?.week ?? 1} of {planLength(active)}</span>
+            <span class="badge">{isPlanComplete(active) ? 'Complete' : `Week ${coming[0]?.week ?? 1} of ${planLength(active)}`}</span>
           </div>
           <div class="card-title" style="display:block; margin-top:4px">{active.name}</div>
           <ul class="slots">

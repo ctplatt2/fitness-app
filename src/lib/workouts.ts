@@ -1,5 +1,5 @@
 import { db, getSettings, type PR, type Program, type Workout, type WorkoutSet } from './db';
-import { estimate1RM } from './math';
+import { estimate1RM, sessionSeconds } from './math';
 import { smallestStep } from './plates';
 import { weekBlockFor } from './plan-parser';
 import { advancedCursor, currentDay } from './programs';
@@ -146,6 +146,7 @@ export async function addSet(workoutId: number, order: number): Promise<void> {
     ...copy,
     setIndex: last.setIndex + 1,
     done: false,
+    doneAt: undefined,
     type: last.type === 'warmup' ? 'normal' : last.type,
     rpe: undefined,
     note: undefined,
@@ -199,12 +200,12 @@ export async function updateSet(id: number, patch: Partial<WorkoutSet>): Promise
 export async function completeSet(set: WorkoutSet, defaultRest: number): Promise<number> {
   const weight = set.weight ?? set.targetWeight;
   const reps = set.reps ?? set.targetMinReps;
-  await db.sets.update(set.id!, { done: true, weight, reps });
+  await db.sets.update(set.id!, { done: true, doneAt: Date.now(), weight, reps });
   return set.restSec ?? defaultRest;
 }
 
 export async function uncompleteSet(id: number): Promise<void> {
-  await db.sets.update(id, { done: false });
+  await db.sets.update(id, { done: false, doneAt: undefined });
 }
 
 export async function discardWorkout(id: number): Promise<void> {
@@ -284,7 +285,8 @@ export async function finishWorkout(id: number): Promise<boolean> {
   const done = sets.filter((s) => s.done);
   const prs = await computePRs(id, done);
   const finishedAt = Date.now();
-  await db.workouts.update(id, { finishedAt, durationSec: Math.round((finishedAt - w.date) / 1000), prs });
+  const durationSec = sessionSeconds(w.date, finishedAt, done.map((s) => s.doneAt ?? 0));
+  await db.workouts.update(id, { finishedAt, durationSec, prs });
   if (w.programId) {
     const p = await db.programs.get(w.programId);
     if (p) await db.programs.update(p.id!, { cursor: advancedCursor(p) });

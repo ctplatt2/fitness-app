@@ -115,6 +115,8 @@ export interface WorkoutSet {
   rpe?: number;
   note?: string;
   done: boolean;
+  /** When the set was marked done. */
+  doneAt?: number;
   superset?: string;
   targetWeight?: number;
   targetMinReps?: number;

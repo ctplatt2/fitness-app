@@ -1,6 +1,8 @@
 import { TABLES, backupFilename, type Backup } from './backup-format';
 import type { ImportedWorkout } from './csv-history';
-import { db, getSettings, type WorkoutSet } from './db';
+import { db, getSettings, type DistanceUnit, type Units, type WorkoutSet } from './db';
+import { serializePlan } from './plan-parser';
+import { EQUIPMENT, convertDistance, convertPlanWeeks, convertWeight } from './units';
 
 export async function buildBackup(): Promise<Backup> {
   const data = {} as Backup['data'];
@@ -101,5 +103,63 @@ export async function runImport(plan: ImportPlan): Promise<void> {
       });
       await db.sets.bulkAdd(rows);
     }
+  });
+}
+
+/** What a weight-unit switch would have to convert. */
+export async function weightDataCounts(): Promise<{ sets: number; body: number; plans: number }> {
+  return {
+    sets: await db.sets.filter((s) => !!s.weight || !!s.targetWeight).count(),
+    body: await db.body.filter((b) => !!b.weight).count(),
+    plans: await db.programs.count(),
+  };
+}
+
+/**
+ * Change the weight unit. With `convert`, every logged weight, target, record,
+ * body weight and plan weight is converted too; without it only the label changes.
+ */
+export async function switchWeightUnits(to: Units, convert: boolean): Promise<void> {
+  await db.transaction('rw', db.settings, db.sets, db.body, db.workouts, db.programs, async () => {
+    const s = await getSettings();
+    if (s.units === to) return;
+    await db.settings.put({ ...s, units: to, ...EQUIPMENT[to] });
+    if (!convert) return;
+    const c = (w: number | undefined) => (w ? convertWeight(w, to) : w);
+    await db.sets.toCollection().modify((row) => {
+      row.weight = c(row.weight);
+      row.targetWeight = c(row.targetWeight);
+    });
+    await db.body.toCollection().modify((row) => {
+      row.weight = c(row.weight);
+    });
+    await db.workouts.toCollection().modify((row) => {
+      for (const pr of row.prs ?? []) {
+        if (pr.kind === 'reps') continue;
+        pr.value = convertWeight(pr.value, to);
+        pr.previous = convertWeight(pr.previous, to);
+      }
+    });
+    await db.programs.toCollection().modify((row) => {
+      row.weeks = convertPlanWeeks(row.weeks, to);
+      row.sourceText = serializePlan(row.name, row.weeks, to);
+    });
+  });
+}
+
+export async function distanceDataCount(): Promise<number> {
+  return db.cardio.filter((c) => !!c.distance).count();
+}
+
+/** Change the distance unit, converting logged distances when asked. */
+export async function switchDistanceUnit(to: DistanceUnit, convert: boolean): Promise<void> {
+  await db.transaction('rw', db.settings, db.cardio, async () => {
+    const s = await getSettings();
+    if (s.distanceUnit === to) return;
+    await db.settings.put({ ...s, distanceUnit: to });
+    if (!convert) return;
+    await db.cardio.toCollection().modify((row) => {
+      if (row.distance) row.distance = convertDistance(row.distance, to);
+    });
   });
 }

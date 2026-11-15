@@ -1,4 +1,4 @@
-import { db, type Exercise, type PlanCardio, type PlanWeek, type Program } from './db';
+import { db, type Cardio, type Exercise, type PlanCardio, type PlanWeek, type Program } from './db';
 import { parsePlan, serializePlan, weekBlockFor } from './plan-parser';
 
 /** Names in the plan that aren't in the exercise library (case-insensitive). */
@@ -85,12 +85,28 @@ export function advancedCursor(p: Program): Program['cursor'] {
   return { week: p.cursor.week + 1, day: 0 };
 }
 
-/** The next n sessions the plan will serve, starting with the one that's up next. */
+/**
+ * True once a multi-week plan has run past its last week. A plan with no week
+ * headings (one repeating week) never completes: it is meant to loop.
+ */
+export function isPlanComplete(p: Program): boolean {
+  const length = planLength(p);
+  return length > 1 && p.cursor.week > length;
+}
+
+/** Whether a logged cardio entry satisfies a plan's cardio day ("Sport" days accept any activity). */
+export function matchesPlanCardio(c: Pick<Cardio, 'activity'>, plan: PlanCardio): boolean {
+  if (c.activity === 'mobility') return false;
+  return plan.activity === 'other' || c.activity === plan.activity;
+}
+
+/** The next n sessions the plan will serve, starting with the one that's up next. Stops at the end of the plan. */
 export function upcomingDays(p: Program, n: number): { week: number; name: string; exercises: number }[] {
   const out: { week: number; name: string; exercises: number }[] = [];
   let cursor = { ...p.cursor };
   for (let i = 0; i < n; i++) {
     const at = { ...p, cursor };
+    if (isPlanComplete(at)) break;
     const { week, day } = currentDay(at);
     if (!day) break;
     out.push({ week, name: day.name, exercises: day.slots.length });

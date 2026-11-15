@@ -225,6 +225,8 @@ function ExerciseBlock(props: {
   const [menu, setMenu] = useState(false);
   const [history, setHistory] = useState(false);
   const [swapping, setSwapping] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const doneSets = props.sets.filter((s) => s.done).length;
   const type = props.exercise?.type ?? 'weight_reps';
   const timed = type === 'time' || props.sets.some((s) => s.timed);
   const showWeight = type !== 'reps' && type !== 'time';
@@ -290,7 +292,19 @@ function ExerciseBlock(props: {
           {showWeight && warmWeight ? (
             <button class="btn small" onClick={() => { setMenu(false); props.onPlates(warmWeight); }}>Plates</button>
           ) : null}
-          <button class="btn small danger" onClick={() => removeExercise(props.workoutId, props.sets[0].order)}>Remove exercise</button>
+          <button class="btn small danger" onClick={() => { setMenu(false); setRemoving(true); }}>Remove exercise</button>
+        </div>
+      )}
+      {removing && (
+        <div class="confirm-inline">
+          <div class="small-text">
+            Remove {props.name} from this workout?
+            {doneSets > 0 ? ` The ${doneSets} set${doneSets === 1 ? '' : 's'} you logged will be deleted.` : ''}
+          </div>
+          <div class="chips" style="margin:8px 0 0">
+            <button class="btn small danger" onClick={() => removeExercise(props.workoutId, props.sets[0].order)}>Yes, remove</button>
+            <button class="btn small" onClick={() => setRemoving(false)}>Keep</button>
+          </div>
         </div>
       )}
 
@@ -333,6 +347,9 @@ function SetRow(props: {
   const [editing, setEditing] = useState(false);
   const [more, setMore] = useState(false);
   const focused = useRef(false);
+  // What's in the boxes right now, readable before the next render.
+  const typed = useRef({ weight, reps });
+  typed.current = { weight, reps };
 
   useEffect(() => {
     if (!focused.current) {
@@ -368,7 +385,9 @@ function SetRow(props: {
       setEditing(false);
       return;
     }
-    const rest = await completeSet(set, props.defaultRest);
+    // Use what's in the boxes right now: a just-typed value may not have reached `set` yet.
+    const num = (raw: string) => (raw.trim() === '' || Number.isNaN(Number(raw)) ? undefined : Number(raw));
+    const rest = await completeSet({ ...set, weight: props.showWeight ? num(typed.current.weight) : set.weight, reps: num(typed.current.reps) }, props.defaultRest);
     if (rest > 0) restTimer.start(rest);
     props.onDone(set);
   }
@@ -397,6 +416,7 @@ function SetRow(props: {
           onBlur={() => (focused.current = false)}
           onInput={(e) => {
             const v = (e.target as HTMLInputElement).value;
+            typed.current.weight = v;
             setWeight(v);
             commit('weight', v);
           }}
@@ -414,6 +434,7 @@ function SetRow(props: {
         onBlur={() => (focused.current = false)}
         onInput={(e) => {
           const v = (e.target as HTMLInputElement).value;
+          typed.current.reps = v;
           setReps(v);
           commit('reps', v);
         }}
