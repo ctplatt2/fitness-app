@@ -37,7 +37,7 @@ function put(s: StravaState | null) {
 export const isConnected = (s: StravaState | null): s is StravaState & { refreshToken: string } => !!s?.refreshToken;
 
 export function saveApp(clientId: string, clientSecret: string) {
-  put({ clientId: clientId.trim(), clientSecret: clientSecret.trim() });
+  put({ clientId: clientId.replace(/\s/g, ''), clientSecret: clientSecret.replace(/\s/g, '') });
 }
 
 /** Where Strava sends you back to. Its host must be the app's "Authorization Callback Domain". */
@@ -75,8 +75,15 @@ async function tokenRequest(params: Record<string, string>) {
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const field = body?.errors?.[0]?.field;
-    if (field === 'client_id' || field === 'client_secret') throw new Error("Strava didn't accept the client ID or secret. Check them against your Strava API page.");
+    const first = body?.errors?.[0];
+    const field = first?.field;
+    if (field === 'client_id') throw new Error("Strava doesn't recognise that Client ID. Tap Change app details and check it against your Strava API page.");
+    // Strava answers a known Client ID with the wrong secret as an "Application" error with no field.
+    if (field === 'client_secret' || (first?.resource === 'Application' && !field)) {
+      throw new Error(
+        "Strava recognised the Client ID, but the Client Secret doesn't match it. Tap Change app details and enter the secret again. Use the line labelled Client Secret on your Strava API page, not the access token or refresh token below it.",
+      );
+    }
     if (field === 'code') throw new Error('That code has expired or was already used. Tap Connect to get a new one.');
     throw new Error(body?.message ? `Strava said: ${body.message}` : `Strava returned an error (${res.status}).`);
   }

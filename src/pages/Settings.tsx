@@ -361,6 +361,9 @@ function StravaCard() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [confirm, setConfirm] = useState(false);
+  const [showSecret, setShowSecret] = useState(false);
+  const secretClean = secret.replace(/\s/g, '');
+  const secretOk = /^[0-9a-f]{40}$/i.test(secretClean);
   const refresh = () => setSt(getStrava());
 
   async function run(fn: () => Promise<string | void>) {
@@ -405,17 +408,37 @@ function StravaCard() {
             </label>
             <label>
               <span class="muted">Client Secret</span>
-              <input class="input" type="password" autocomplete="off" value={secret} onInput={(e) => setSecret((e.target as HTMLInputElement).value)} />
+              <input
+                class="input"
+                type={(showSecret ? 'text' : 'password') as 'text'}
+                autocomplete="off"
+                autocapitalize="off"
+                autocorrect="off"
+                spellcheck={false}
+                value={secret}
+                onInput={(e) => setSecret((e.target as HTMLInputElement).value)}
+              />
             </label>
           </div>
+          {secret && (
+            <p class={secretOk ? 'ok small-text' : 'warn small-text'} style="margin:8px 0 0">
+              {secretOk
+                ? 'Looks right: 40 characters.'
+                : /[^0-9a-f]/i.test(secretClean)
+                  ? 'A Client Secret only has the digits 0–9 and letters a–f. Check for a typo.'
+                  : `${secretClean.length} of 40 characters.`}{' '}
+              <button class="linkbtn small-text" style="padding:0; color:inherit" onClick={() => setShowSecret((v) => !v)}>{showSecret ? 'Hide' : 'Show'}</button>
+            </p>
+          )}
           <p class="muted small-text" style="margin:8px 0 0">These stay on this device only. They are not in the app's code and are left out of backups.</p>
           <button
             class="btn small primary"
             style="margin-top:12px"
-            disabled={!/^\d+$/.test(id.trim()) || secret.trim().length < 20}
+            disabled={!/^\d+$/.test(id.trim()) || !secretOk}
             onClick={() => {
               saveApp(id, secret);
               setSecret('');
+              setShowSecret(false);
               refresh();
             }}
           >
