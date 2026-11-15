@@ -3,6 +3,7 @@ import { checkBackup, type BackupCheck } from '../lib/backup-format';
 import { parseHistoryCsv } from '../lib/csv-history';
 import { backUpNow, planImport, restoreBackup, runImport, type ImportPlan } from '../lib/data-io';
 import { db, getSettings, type Settings } from '../lib/db';
+import { askForNotifications, lockAlarmEnabled, notificationState, setLockAlarm } from '../lib/timer';
 import { useLive } from '../lib/use-live';
 
 const fmtDay = (ts: number) => new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
@@ -46,6 +47,8 @@ export function SettingsPage(_props: { path?: string }) {
       </div>
 
       <Equipment s={s} save={save} />
+      <AlertsCard />
+      <ListsCard s={s} save={save} />
       <BackupCard s={s} />
       <ImportCard s={s} />
     </>
@@ -254,6 +257,95 @@ function ImportCard(props: { s: Settings }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function AlertsCard() {
+  const [perm, setPerm] = useState(notificationState());
+  const [lock, setLock] = useState(lockAlarmEnabled());
+  return (
+    <div class="card">
+      <strong>Rest timer alerts</strong>
+      <p class="muted small-text" style="margin:6px 0 0">
+        With the app open, the timer beeps when rest is over. Phones pause web apps in the background, so these two options help when you switch apps or lock the screen.
+      </p>
+
+      <div class="row-between" style="margin-top:12px">
+        <div>
+          <div>Notification</div>
+          <div class="muted small-text">
+            {perm === 'granted'
+              ? 'On. Shows "Rest over" if the app is in the background and still running.'
+              : perm === 'denied'
+                ? "Blocked. Allow notifications for Lift Log in your phone's settings."
+                : perm === 'unsupported'
+                  ? 'Not available here. On iPhone, open the app from its home-screen icon.'
+                  : 'Shows "Rest over" if the app is in the background and still running.'}
+          </div>
+        </div>
+        {perm === 'default' && <button class="btn small" onClick={async () => setPerm(await askForNotifications())}>Allow</button>}
+      </div>
+
+      <div class="row-between" style="margin-top:12px">
+        <div>
+          <div>Lock-screen sound <span class="badge subtle">experimental</span></div>
+          <div class="muted small-text">
+            Plays a silent track during rest that ends in the beeps, so they sound even with the phone locked. It will pause music from other apps.
+          </div>
+        </div>
+        <button
+          class={lock ? 'btn small primary' : 'btn small'}
+          onClick={() => {
+            setLockAlarm(!lock);
+            setLock(!lock);
+          }}
+        >
+          {lock ? 'On' : 'Off'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ListsCard(props: { s: Settings; save: (p: Partial<Settings>) => Promise<unknown> }) {
+  const { s } = props;
+  const [mobility, setMobility] = useState(s.mobility.join('\n'));
+  const [target, setTarget] = useState(String(s.mobilityTarget));
+  const [tests, setTests] = useState(s.testMetrics.join('\n'));
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    setMobility(s.mobility.join('\n'));
+    setTarget(String(s.mobilityTarget));
+    setTests(s.testMetrics.join('\n'));
+  }, [s.mobility.join('|'), s.mobilityTarget, s.testMetrics.join('|')]);
+
+  const lines = (t: string) => t.split('\n').map((l) => l.trim()).filter(Boolean);
+  const dirty = mobility !== s.mobility.join('\n') || target !== String(s.mobilityTarget) || tests !== s.testMetrics.join('\n');
+
+  async function apply() {
+    await props.save({ mobility: lines(mobility), mobilityTarget: Math.max(1, Math.round(Number(target)) || 1), testMetrics: lines(tests) });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1500);
+  }
+
+  return (
+    <div class="card">
+      <strong>Mobility and check-ins</strong>
+      <label style="display:block; margin-top:8px">
+        <span class="muted small-text">Mobility circuit, one move per line (add " · dose" after the name)</span>
+        <textarea class="input" rows={7} value={mobility} onInput={(e) => setMobility((e.target as HTMLTextAreaElement).value)} />
+      </label>
+      <label style="display:block; margin-top:10px">
+        <span class="muted small-text">Circuits per week to aim for</span>
+        <input class="input" type="number" inputMode="numeric" value={target} onInput={(e) => setTarget((e.target as HTMLInputElement).value)} />
+      </label>
+      <label style="display:block; margin-top:10px">
+        <span class="muted small-text">Check-in tests, one per line (renaming a test hides its old results)</span>
+        <textarea class="input" rows={6} value={tests} onInput={(e) => setTests((e.target as HTMLTextAreaElement).value)} />
+      </label>
+      <button class="btn small primary" style="margin-top:12px" disabled={!dirty} onClick={apply}>{saved ? 'Saved' : 'Save'}</button>
     </div>
   );
 }

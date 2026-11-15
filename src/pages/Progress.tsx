@@ -1,8 +1,10 @@
-import { useMemo, useState } from 'preact/hooks';
+import { useEffect, useMemo, useState } from 'preact/hooks';
 import { CHART_GREEN, SeriesChart } from '../components/SeriesChart';
+import { CheckIns, checkpointForWeek } from '../components/CheckIns';
 import { ExerciseHistory } from '../components/ExerciseHistory';
 import { formatDuration } from '../lib/cardio';
 import { db, getSettings } from '../lib/db';
+import { currentDay, getActiveProgram } from '../lib/programs';
 import { addWeeks, bestLifts, dayStart, exerciseSeries, weekStart, weekStreak, weeklyCardio, weeklyMuscleSets } from '../lib/stats';
 import { useLive } from '../lib/use-live';
 
@@ -12,7 +14,8 @@ type Metric = 'e1rm' | 'top' | 'volume';
 export function Progress(_props: { path?: string }) {
   const workoutsAll = useLive(() => db.workouts.toArray());
   const sets = useLive(() => db.sets.toArray());
-  const cardio = useLive(() => db.cardio.toArray());
+  const cardioAll = useLive(() => db.cardio.toArray());
+  const program = useLive(() => getActiveProgram());
   const exercises = useLive(() => db.exercises.toArray());
   const body = useLive(() => db.body.orderBy('date').toArray());
   const settings = useLive(() => getSettings());
@@ -24,12 +27,24 @@ export function Progress(_props: { path?: string }) {
   const workouts = useMemo(() => (workoutsAll ?? []).filter((w) => w.finishedAt), [workoutsAll]);
   const bests = useMemo(() => bestLifts(sets ?? [], workouts), [sets, workouts]);
 
-  if (!workoutsAll || !sets || !cardio || !exercises || !body || !settings) return <h1>Progress</h1>;
+  const ready = !!(workoutsAll && sets && cardioAll && exercises && body && settings);
+  // Opened from the Today check-in prompt: jump to the tests.
+  useEffect(() => {
+    if (ready && new URLSearchParams(location.search).get('show') === 'checkins') {
+      requestAnimationFrame(() => document.getElementById('checkins')?.scrollIntoView({ block: 'start' }));
+    }
+  }, [ready]);
+
+  if (!workoutsAll || !sets || !cardioAll || !exercises || !body || !settings) return <h1>Progress</h1>;
+  // Mobility circuits are logged alongside cardio but tracked separately.
+  const cardio = cardioAll.filter((c) => c.activity !== 'mobility');
+  const mobilityDays = new Set(cardioAll.filter((c) => c.activity === 'mobility').map((c) => dayStart(c.date)));
+  const checkins = <CheckIns settings={settings} current={program ? checkpointForWeek(currentDay(program).week) : null} />;
 
   const now = Date.now();
   const u = settings.units;
   const du = settings.distanceUnit;
-  const sessionDates = [...workouts.map((w) => w.date), ...cardio.map((c) => c.date)];
+  const sessionDates = [...workouts.map((w) => w.date), ...cardioAll.map((c) => c.date)];
   const thisWeek = weekStart(now);
   const sessionsThisWeek = sessionDates.filter((d) => d >= thisWeek).length;
   const streak = weekStreak(sessionDates, now);
@@ -39,6 +54,7 @@ export function Progress(_props: { path?: string }) {
       <>
         <h1>Progress</h1>
         <div class="empty">Finish a workout or log some cardio and your charts, records and streak will appear here.</div>
+        {checkins}
         <BodyWeight body={body} units={u} bw={bw} setBw={setBw} />
       </>
     );
@@ -93,13 +109,15 @@ export function Progress(_props: { path?: string }) {
           {days.map((d) => {
             const lift = liftDays.has(d);
             const run = cardioDays.has(d);
+            const mob = mobilityDays.has(d);
             const future = d > now;
             return (
-              <div key={d} class={`cal-d${dayStart(now) === d ? ' today' : ''}${future ? ' future' : ''}`} title={`${shortDate(d)}${lift ? ' · lifting' : ''}${run ? ' · cardio' : ''}`}>
+              <div key={d} class={`cal-d${dayStart(now) === d ? ' today' : ''}${future ? ' future' : ''}`} title={`${shortDate(d)}${lift ? ' · lifting' : ''}${run ? ' · cardio' : ''}${mob ? ' · mobility' : ''}`}>
                 <span>{new Date(d).getDate()}</span>
                 <span class="cal-marks">
                   {lift && <i class="mk lift" />}
                   {run && <i class="mk cardio" />}
+                  {mob && <i class="mk mob" />}
                 </span>
               </div>
             );
@@ -108,6 +126,7 @@ export function Progress(_props: { path?: string }) {
         <div class="legend muted small-text">
           <span><i class="mk lift" /> Lifting</span>
           <span><i class="mk cardio" /> Cardio</span>
+          <span><i class="mk mob" /> Mobility</span>
         </div>
       </div>
 
@@ -208,6 +227,7 @@ export function Progress(_props: { path?: string }) {
         </div>
       )}
 
+      {checkins}
       <BodyWeight body={body} units={u} bw={bw} setBw={setBw} />
     </>
   );

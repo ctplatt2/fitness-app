@@ -4,6 +4,7 @@ import { ACTIVITIES, describeEffort, formatDuration } from '../lib/cardio';
 import { db, getSettings, type Cardio, type Workout, type WorkoutSet } from '../lib/db';
 import { useLive } from '../lib/use-live';
 import { deleteWorkout, fmtDuration } from '../lib/workouts';
+import { FEEL } from './WorkoutSummary';
 import { BASE } from '../base';
 
 function fmtDate(ts: number): string {
@@ -122,6 +123,13 @@ function WorkoutCard(props: {
         {fmtDuration(w.durationSec ?? 0)} · {c?.sets ?? 0} sets · {c?.exercises.size ?? 0} exercises
         {w.prs?.length ? ` · 🏆 ${w.prs.length} PR${w.prs.length === 1 ? '' : 's'}` : ''}
       </div>
+      {(w.energy || w.soreness || w.notes) && (
+        <div class="small-text" style="margin-top:4px">
+          {[w.energy ? `Energy ${FEEL.energy[w.energy - 1].toLowerCase()}` : '', w.soreness ? `soreness ${FEEL.soreness[w.soreness - 1].toLowerCase()}` : '', w.notes ?? '']
+            .filter(Boolean)
+            .join(' · ')}
+        </div>
+      )}
       {open && sets && (
         <ul class="slots">
           {[...new Map(sets.sort((a, b) => a.order - b.order || a.setIndex - b.setIndex).map((s) => [s.order, s.exerciseName])).entries()].map(([order, name]) => (
@@ -139,7 +147,7 @@ function WorkoutCard(props: {
           ))}
           <li>
             <Link href={`${BASE}/workout/${w.id}/summary`} class="muted small-text" onClick={(e: Event) => e.stopPropagation()}>
-              View summary →
+              Summary and notes →
             </Link>
           </li>
           <li>

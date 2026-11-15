@@ -6,6 +6,8 @@ import { useLive } from '../lib/use-live';
 import { fmtDuration, workoutVolume } from '../lib/workouts';
 import { BASE } from '../base';
 
+export const FEEL = { energy: ['Low', 'OK', 'Good'], soreness: ['None', 'Some', 'A lot'] };
+
 export function WorkoutSummary(props: { path?: string; id?: string }) {
   const id = Number(props.id);
   const workout = useLive(() => db.workouts.get(id).then((w) => w ?? null), [id]);
@@ -66,6 +68,37 @@ export function WorkoutSummary(props: { path?: string; id?: string }) {
           </div>
         );
       })}
+
+      <div class="card">
+        <strong>How did it go?</strong>
+        <div class="feel">
+          <span class="muted small-text">Energy</span>
+          <div class="chips" style="margin:4px 0 0">
+            {FEEL.energy.map((label, i) => (
+              <button key={label} class={workout.energy === i + 1 ? 'chip active' : 'chip'} onClick={() => db.workouts.update(id, { energy: workout.energy === i + 1 ? undefined : i + 1 })}>{label}</button>
+            ))}
+          </div>
+        </div>
+        <div class="feel">
+          <span class="muted small-text">Soreness or aches</span>
+          <div class="chips" style="margin:4px 0 0">
+            {FEEL.soreness.map((label, i) => (
+              <button key={label} class={workout.soreness === i + 1 ? 'chip active' : 'chip'} onClick={() => db.workouts.update(id, { soreness: workout.soreness === i + 1 ? undefined : i + 1 })}>{label}</button>
+            ))}
+          </div>
+        </div>
+        <label style="display:block; margin-top:12px">
+          <span class="muted small-text">Note</span>
+          <textarea
+            class="input"
+            rows={2}
+            placeholder="What felt good, what hurt, what to change next time"
+            value={workout.notes ?? ''}
+            onChange={(e) => db.workouts.update(id, { notes: (e.target as HTMLTextAreaElement).value.trim() || undefined })}
+          />
+        </label>
+        <div class="muted small-text" style="margin-top:6px">Saved as you go. You can come back to this from History.</div>
+      </div>
 
       <Link class="btn primary block" href={`${BASE}/`}>Done</Link>
     </>

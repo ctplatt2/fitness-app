@@ -9,6 +9,7 @@ import { History } from './pages/History';
 import { WorkoutPage } from './pages/Workout';
 import { WorkoutSummary } from './pages/WorkoutSummary';
 import { CardioEntry } from './pages/CardioEntry';
+import { Mobility } from './pages/Mobility';
 import { Progress } from './pages/Progress';
 import { SettingsPage } from './pages/Settings';
 import { BASE } from './base';
@@ -26,6 +27,7 @@ function tabFor(url: string): string {
   const p = url.replace(BASE, '').split('?')[0] || '/';
   if (p === '/') return '/';
   if (p.startsWith('/cardio')) return '/history';
+  if (p.startsWith('/mobility') || p.startsWith('/workout')) return '/';
   const hit = TABS.find((t) => t.path !== '/' && p.startsWith(t.path));
   return hit ? hit.path : '/';
 }
@@ -55,6 +57,7 @@ export function App() {
           <PlanEditor path={`${BASE}/plans/:id/edit`} />
           <WorkoutPage path={`${BASE}/workout/:id`} />
           <WorkoutSummary path={`${BASE}/workout/:id/summary`} />
+          <Mobility path={`${BASE}/mobility`} />
           <CardioEntry path={`${BASE}/cardio/new`} />
           <CardioEntry path={`${BASE}/cardio/:id`} />
           <History path={`${BASE}/history`} />

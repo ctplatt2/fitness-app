@@ -4,6 +4,8 @@ import { db, getSettings } from '../lib/db';
 import { useLive } from '../lib/use-live';
 import { advanceProgram, cardioMinutes, currentDay, getActiveProgram } from '../lib/programs';
 import { getActiveWorkout, startEmptyWorkout, startWorkoutFromProgram } from '../lib/workouts';
+import { CHECKPOINTS, checkpointForWeek, missingTests } from '../components/CheckIns';
+import { mobilityThisWeek } from './Mobility';
 import { describeSlot } from './PlanDetail';
 import { BASE } from '../base';
 
@@ -13,6 +15,7 @@ export function Today(_props: { path?: string }) {
   const settings = useLive(() => getSettings());
   const exerciseCount = useLive(() => db.exercises.count());
   const loggedCount = useLive(async () => (await db.workouts.count()) + (await db.cardio.count()));
+  const mobilityCount = useLive(() => mobilityThisWeek());
   const [busy, setBusy] = useState(false);
 
   if (program === undefined || active === undefined || !settings) return <h1>Today</h1>;
@@ -20,6 +23,8 @@ export function Today(_props: { path?: string }) {
   const next = program ? currentDay(program) : null;
   const day = next?.day;
   const hasLifts = !!day && day.slots.length > 0;
+  const checkpoint = next ? checkpointForWeek(next.week) : null;
+  const testsDue = checkpoint ? missingTests(settings, checkpoint) : 0;
 
   async function start(kind: 'plan' | 'empty') {
     if (busy) return;
@@ -112,6 +117,25 @@ export function Today(_props: { path?: string }) {
         )}
         <Link class="btn" style="flex:1" href={`${BASE}/cardio/new`}>Log cardio</Link>
       </div>
+
+      <div class="card row-between">
+        <div>
+          <strong>Mobility circuit</strong>
+          <div class="muted small-text">
+            {mobilityCount ?? 0} of {settings.mobilityTarget} this week · about 10 min
+          </div>
+        </div>
+        <Link class="btn small" href={`${BASE}/mobility`}>Start</Link>
+      </div>
+
+      {checkpoint && testsDue > 0 && (
+        <Link class="card reminder" href={`${BASE}/progress?show=checkins`}>
+          <strong>{CHECKPOINTS.find((c) => c.id === checkpoint)!.label} check-in</strong>
+          <span class="muted small-text">
+            {testsDue} test{testsDue === 1 ? '' : 's'} to record this week so you can compare later. Tap to enter them.
+          </span>
+        </Link>
+      )}
 
       {(loggedCount ?? 0) >= 3 && (!settings.lastBackup || Date.now() - settings.lastBackup > 14 * 86400000) && (
         <Link class="card reminder" href={`${BASE}/settings`}>

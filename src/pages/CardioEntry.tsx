@@ -85,7 +85,7 @@ export function CardioEntry(props: { path?: string; id?: string }) {
       </div>
 
       <div class="chips scroll">
-        {ACTIVITIES.map((a) => (
+        {ACTIVITIES.filter((a) => a.id !== 'mobility' || activity === 'mobility').map((a) => (
           <button key={a.id} class={activity === a.id ? 'chip active' : 'chip'} onClick={() => setActivity(a.id)}>
             {a.icon} {a.label}
           </button>

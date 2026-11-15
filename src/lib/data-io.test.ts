@@ -82,3 +82,20 @@ describe('parseHistoryCsv', () => {
     expect(parseHistoryCsv('', 'lb').error).toBeDefined();
   });
 });
+
+describe('lock-screen alarm track', () => {
+  it('is a valid WAV: silence for the rest, then beeps', async () => {
+    const { buildAlarmWav } = await import('./timer');
+    const wav = buildAlarmWav(2);
+    const text = (o: number) => String.fromCharCode(...wav.slice(o, o + 4));
+    expect(text(0)).toBe('RIFF');
+    expect(text(8)).toBe('WAVE');
+    const view = new DataView(wav.buffer);
+    expect(view.getUint32(40, true)).toBe(wav.length - 44);
+    expect(view.getUint32(4, true)).toBe(wav.length - 8);
+    // two seconds of silence at 8 kHz…
+    expect(wav.slice(44, 44 + 16000).every((b) => b === 128)).toBe(true);
+    // …then sound
+    expect(wav.slice(44 + 16000, 44 + 16000 + 1600).some((b) => Math.abs(b - 128) > 50)).toBe(true);
+  });
+});

@@ -4,7 +4,7 @@ import { SEED_EXERCISES } from './seed-exercises';
 export type Units = 'lb' | 'kg';
 export type ExerciseType = 'weight_reps' | 'reps' | 'time' | 'distance';
 export type SetType = 'normal' | 'warmup' | 'drop' | 'failure';
-export type CardioActivity = 'run' | 'bike' | 'row' | 'walk' | 'swim' | 'other';
+export type CardioActivity = 'run' | 'bike' | 'row' | 'walk' | 'swim' | 'other' | 'mobility';
 
 export interface Exercise {
   id?: number;
@@ -95,6 +95,10 @@ export interface Workout {
   finishedAt?: number;
   durationSec?: number;
   notes?: string;
+  /** How the session felt, 1 (low) to 3 (good). */
+  energy?: number;
+  /** Soreness afterwards, 1 (none) to 3 (a lot). */
+  soreness?: number;
   prs?: PR[];
 }
 
@@ -149,6 +153,14 @@ export interface Settings {
   plates: number[];
   defaultRest: number;
   lastBackup?: number;
+  /** Moves in the mobility circuit, one per entry. */
+  mobility: string[];
+  /** How many circuits a week to aim for. */
+  mobilityTarget: number;
+  /** Check-in test names, measured at baseline, week 6 and week 12. */
+  testMetrics: string[];
+  /** Recorded results, keyed `${metric}|${checkpoint}`. */
+  testValues: Record<string, string>;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -158,6 +170,25 @@ export const DEFAULT_SETTINGS: Settings = {
   barWeight: 45,
   plates: [45, 35, 25, 10, 5, 2.5],
   defaultRest: 120,
+  mobility: [
+    'Knee-to-wall ankle mobilization · 10 / side',
+    'Bent-knee calf raises · 12 / side',
+    'Straight-knee calf raises · 12 / side',
+    'Tibialis raises · 15',
+    '90/90 hip switches · 10 total',
+    'Adductor rock-backs · 10 / side',
+    'Single-leg balance with reach · 30 sec / side',
+  ],
+  mobilityTarget: 3,
+  testMetrics: [
+    'Back squat: load × 5',
+    'Trap-bar deadlift: load × 5',
+    'Strict pull-ups',
+    'Push-ups (clean reps)',
+    '10–20 m sprint (optional)',
+    'Easy run: pace / effort',
+  ],
+  testValues: {},
 };
 
 class LiftLogDB extends Dexie {

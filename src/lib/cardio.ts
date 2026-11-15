@@ -7,6 +7,7 @@ export const ACTIVITIES: { id: CardioActivity; label: string; icon: string; pace
   { id: 'row', label: 'Row', icon: '🚣', paced: true },
   { id: 'swim', label: 'Swim', icon: '🏊', paced: true },
   { id: 'other', label: 'Other', icon: '⏱', paced: false },
+  { id: 'mobility', label: 'Mobility', icon: '🧘', paced: false },
 ];
 
 /** "45", "45:30" or "1:05:20" → seconds. Null when it isn't a time. */

@@ -381,3 +381,14 @@ a.card.reminder { display: flex; flex-direction: column; gap: 4px; text-decorati
 .pill { padding: 3px 9px; border-radius: 999px; background: var(--surface-2); font-size: 0.85rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .pill.warm { color: var(--muted); }
 .sheet .pill { background: var(--bg); }
+
+/* ---- Notes, mobility, check-ins ---- */
+.feel { margin-top: 12px; }
+textarea.input { resize: vertical; font-family: inherit; line-height: 1.4; }
+.card.row-between { align-items: center; }
+.card.row-between + * { margin-top: 0; }
+.checklist .list-item { padding: 12px 0; }
+.checklist .checked > div { opacity: 0.55; text-decoration: line-through; }
+.checkin { padding-top: 12px; margin-top: 12px; border-top: 1px solid var(--border); }
+.checkin .input { min-height: 40px; padding: 6px 8px; margin-top: 2px; }
+.mk.mob { background: #a855f7; transform: rotate(45deg) scale(0.85); border-radius: 1px; }
