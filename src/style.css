@@ -374,3 +374,10 @@ a.card.reminder { display: flex; flex-direction: column; gap: 4px; text-decorati
 .block-details > summary::before { content: '▸'; color: var(--muted); font-size: 0.9rem; }
 .block-details[open] > summary::before { content: '▾'; }
 .ss { white-space: nowrap; }
+
+/* ---- Exercise history ---- */
+.exhist-row { padding: 10px 0; border-top: 1px solid var(--border); }
+.exhist-sets { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.pill { padding: 3px 9px; border-radius: 999px; background: var(--surface-2); font-size: 0.85rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pill.warm { color: var(--muted); }
+.sheet .pill { background: var(--bg); }

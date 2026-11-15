@@ -1,5 +1,6 @@
 import { route } from 'preact-router';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { ExerciseHistory } from '../components/ExerciseHistory';
 import { ExercisePicker } from '../components/ExercisePicker';
 import { PlateSheet } from '../components/PlateSheet';
 import { Sheet } from '../components/Sheet';
@@ -221,6 +222,7 @@ function ExerciseBlock(props: {
   onDone: (set: WorkoutSet) => void;
 }) {
   const [menu, setMenu] = useState(false);
+  const [history, setHistory] = useState(false);
   const type = props.exercise?.type ?? 'weight_reps';
   const timed = type === 'time' || props.sets.some((s) => s.timed);
   const showWeight = type !== 'reps' && type !== 'time';
@@ -251,8 +253,14 @@ function ExerciseBlock(props: {
         </div>
         <button class="btn small" onClick={() => setMenu((v) => !v)} aria-label="Exercise options">⋯</button>
       </div>
+      {history && (
+        <Sheet title={`${props.name} history`} onClose={() => setHistory(false)}>
+          <ExerciseHistory name={props.name} units={props.settings.units} initial={8} />
+        </Sheet>
+      )}
       {menu && (
         <div class="chips">
+          <button class="btn small" onClick={() => { setMenu(false); setHistory(true); }}>History</button>
           {canWarmup && (
             <button
               class="btn small"

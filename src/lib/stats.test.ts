@@ -94,3 +94,15 @@ describe('weeklyCardio', () => {
     expect(w[2]).toMatchObject({ sessions: 2, durationSec: 6000 });
   });
 });
+
+describe('exerciseSessions', () => {
+  it('lists every finished session newest first, with warm-ups but not undone sets', async () => {
+    const { exerciseSessions } = await import('./stats');
+    const s = exerciseSessions('Squat', sets, workouts);
+    expect(s.map((x) => x.workoutId)).toEqual([2, 1]);
+    expect(s[1].sets).toHaveLength(3);
+    expect(s[1].sets.some((x) => x.type === 'warmup')).toBe(true);
+    expect(s[0].sets).toHaveLength(1);
+    expect(s[0].e1rm).toBeCloseTo(221.7, 1);
+  });
+});

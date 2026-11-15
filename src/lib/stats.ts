@@ -134,3 +134,35 @@ export function weeklyCardio(cardio: Cardio[], weeks: number, now: number): Card
   }
   return out;
 }
+
+export interface ExerciseSession {
+  workoutId: number;
+  date: number;
+  dayName?: string;
+  /** Every completed set, warm-ups included, in the order performed. */
+  sets: WorkoutSet[];
+  /** Best estimated 1RM among working sets (0 when unweighted). */
+  e1rm: number;
+}
+
+/** Every finished session of an exercise with all its sets, newest first. */
+export function exerciseSessions(name: string, sets: WorkoutSet[], workouts: Workout[]): ExerciseSession[] {
+  const byId = new Map(workouts.filter((w) => w.finishedAt).map((w) => [w.id!, w]));
+  const groups = new Map<number, WorkoutSet[]>();
+  for (const s of sets) {
+    if (s.exerciseName !== name || !s.done || !byId.has(s.workoutId)) continue;
+    (groups.get(s.workoutId) ?? groups.set(s.workoutId, []).get(s.workoutId)!).push(s);
+  }
+  return [...groups.entries()]
+    .map(([id, g]) => {
+      const w = byId.get(id)!;
+      return {
+        workoutId: id,
+        date: w.date,
+        dayName: w.dayName,
+        sets: g.sort((a, b) => a.setIndex - b.setIndex),
+        e1rm: Math.max(0, ...g.filter((s) => working(s) && s.weight).map((s) => estimate1RM(s.weight!, s.reps!))),
+      };
+    })
+    .sort((a, b) => b.date - a.date);
+}

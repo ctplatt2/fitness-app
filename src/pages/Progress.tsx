@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'preact/hooks';
 import { CHART_GREEN, SeriesChart } from '../components/SeriesChart';
+import { ExerciseHistory } from '../components/ExerciseHistory';
 import { formatDuration } from '../lib/cardio';
 import { db, getSettings } from '../lib/db';
 import { addWeeks, bestLifts, dayStart, exerciseSeries, weekStart, weekStreak, weeklyCardio, weeklyMuscleSets } from '../lib/stats';
@@ -19,7 +20,6 @@ export function Progress(_props: { path?: string }) {
   const [metric, setMetric] = useState<Metric>('e1rm');
   const [weekOffset, setWeekOffset] = useState(0);
   const [bw, setBw] = useState('');
-  const [showTable, setShowTable] = useState(false);
 
   const workouts = useMemo(() => (workoutsAll ?? []).filter((w) => w.finishedAt), [workoutsAll]);
   const bests = useMemo(() => bestLifts(sets ?? [], workouts), [sets, workouts]);
@@ -132,17 +132,9 @@ export function Progress(_props: { path?: string }) {
             )}
           </div>
           <SeriesChart kind="line" label={metricLabel} labels={series.map((p) => shortDate(p.date))} values={series.map(value)} />
-          <button class="linkbtn muted small-text" onClick={() => setShowTable((v) => !v)}>{showTable ? 'Hide table' : 'Show as table'}</button>
-          {showTable && (
-            <table class="table">
-              <thead><tr><th>Date</th><th>Top set</th><th>Est. 1RM</th><th>Volume</th></tr></thead>
-              <tbody>
-                {[...series].reverse().map((p) => (
-                  <tr key={p.date}><td>{shortDate(p.date)}</td><td>{p.topWeight ? `${p.topWeight} ${u}` : `${p.topReps} reps`}</td><td>{p.e1rm || '–'}</td><td>{p.volume || '–'}</td></tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+          <strong style="display:block; margin-top:16px">Every session</strong>
+          <div class="muted small-text">Each set as you logged it ({weighted ? `${u} × reps` : 'reps'}). W marks a warm-up.</div>
+          <ExerciseHistory key={name} name={name} units={u} />
         </div>
       )}
 
