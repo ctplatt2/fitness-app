@@ -63,8 +63,10 @@ export function PlanDetail(props: { path?: string; id?: string }) {
   }
 
   const units = settings.units;
-  const nextBlock = weekBlockFor(program.weeks, program.cursor.week).block;
-  const nextDay = Math.min(program.cursor.day, Math.max(0, nextBlock.days.length - 1));
+  // A finished plan has no "next" day until one is picked.
+  const complete = isPlanComplete(program);
+  const nextBlock = complete ? null : weekBlockFor(program.weeks, program.cursor.week).block;
+  const nextDay = nextBlock ? Math.min(program.cursor.day, Math.max(0, nextBlock.days.length - 1)) : -1;
   const coming = upcomingDays(program, 5);
   const single = program.weeks.length === 1;
 
@@ -210,7 +212,7 @@ export function PlanDetail(props: { path?: string; id?: string }) {
         return single ? (
           <section key={bi}>{days}</section>
         ) : (
-          <details key={bi} class="block-details" open={w === nextBlock || !program.active}>
+          <details key={bi} class="block-details" open={w === nextBlock || !program.active || (complete && bi === 0)}>
             <summary>
               {blockTitle(w)}
               {program.active && w === nextBlock && <span class="badge subtle">current</span>}

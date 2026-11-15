@@ -30,6 +30,9 @@ export async function restoreBackup(b: Backup): Promise<void> {
     }
   });
   try {
+    // Activities synced after this backup was made are gone now: have the next Strava sync look back the full 90 days.
+    const strava = JSON.parse(localStorage.getItem('liftlog.strava') || 'null');
+    if (strava?.lastSync) localStorage.setItem('liftlog.strava', JSON.stringify({ ...strava, lastSync: undefined }));
     const ids = [...new Set([...readIgnored(), ...(Array.isArray(b.stravaIgnored) ? b.stravaIgnored : [])])].filter((n) => typeof n === 'number');
     if (ids.length) localStorage.setItem(IGNORED_KEY, JSON.stringify(ids.slice(-500)));
   } catch {
