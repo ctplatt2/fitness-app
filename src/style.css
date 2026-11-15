@@ -324,3 +324,32 @@ body.has-timer .content { padding-bottom: calc(var(--tab-h) + 96px + env(safe-ar
 .day-label { font-size: 0.85rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin: 20px 0 8px; }
 .effort { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
 input[type="datetime-local"].input { -webkit-appearance: none; appearance: none; }
+
+/* ---- Phase 5: progress ---- */
+.chart { position: relative; height: 190px; margin-top: 12px; }
+.hero { margin-top: 12px; }
+.linkbtn { background: none; border: 0; padding: 8px 0 0; font: inherit; text-decoration: underline; cursor: pointer; }
+.table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 0.85rem; }
+.table th, .table td { text-align: left; padding: 6px 4px; border-top: 1px solid var(--border); }
+.table th { color: var(--muted); font-weight: 600; border-top: 0; }
+
+.cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cal-h { text-align: center; }
+.cal-d {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  min-height: 42px; border-radius: 8px; background: var(--surface-2); font-size: 0.8rem;
+}
+.cal-d.today { outline: 2px solid var(--accent); }
+.cal-d.future { opacity: 0.35; }
+.cal-marks { display: flex; gap: 3px; height: 8px; }
+.mk { display: inline-block; width: 8px; height: 8px; }
+.mk.lift { background: #0284c7; border-radius: 2px; }
+.mk.cardio { background: #16a34a; border-radius: 50%; }
+.legend { display: flex; gap: 16px; margin-top: 10px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+
+.hbars { margin-top: 12px; display: grid; gap: 8px; }
+.hbar-row { display: grid; grid-template-columns: 92px 1fr 28px; align-items: center; gap: 8px; }
+.hbar-track { display: block; height: 14px; }
+.hbar { display: block; height: 100%; min-width: 4px; background: #0284c7; border-radius: 0 4px 4px 0; }
+.hbar-v { text-align: right; font-variant-numeric: tabular-nums; }
